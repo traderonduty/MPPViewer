@@ -78,7 +78,7 @@ select{border:1px solid var(--rule);border-radius:7px;padding:6px 8px;background
 .sheet{position:relative}
 .hrow{position:sticky;top:0;z-index:5;display:flex;height:52px;background:var(--sheet);border-bottom:1px solid var(--rule)}
 .hleft{position:sticky;left:0;z-index:6;flex:none;width:var(--left);display:grid;align-items:end;background:var(--sheet);border-right:1px solid var(--rule)}
-.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 84px 106px 106px 50px}
+.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 104px 106px 106px 50px}
 .hleft .cols>div{padding:0 8px 7px;font-size:12px;font-weight:500;color:var(--ink-2)}
 .hleft .cols>div.r,.row .r{text-align:right}
 .scale{position:relative;flex:none;height:52px}
@@ -180,7 +180,7 @@ body.dragging.loaded .hint{display:grid}
 @media (max-width:900px){
   :root{--left:300px}
   #expand,#collapse,.check,#today{display:none}
-  .cols{grid-template-columns:40px minmax(0,1fr) 60px}
+  .cols{grid-template-columns:40px minmax(0,1fr) 92px}
   .cols>div:nth-child(n+4){display:none}
   .facts{margin-left:0;width:100%;gap:16px}
   .proj{border-left:0;padding-left:0}
@@ -257,7 +257,7 @@ const fmt = d => d ? `${WD[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}/${Strin
 const fmtLong = d => d ? `${WD[d.getDay()]} ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '—';
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const dur = t => { if(t.durationDays!=null){ const d=Math.round(t.durationDays*10)/10; return d===1?'1 day':`${d} days`; } return t.duration||''; };
+const dur = t => { const q = t.estimated ? '?' : ''; if(t.durationDays!=null){ const d=Math.round(t.durationDays*100)/100; return (d===1?'1 day':`${d} days`)+q; } return t.duration ? t.duration+q : ''; };
 const today = () => new Date();
 
 /* ---------- loading ---------- */
@@ -304,6 +304,7 @@ function load(data){
   // Hide the auto "project summary" row (ID 0) if Project wrote one; show its children at top level
   const root = tasks.find(t => t.id===0 && t.summary);
   state.rootUid = root ? root.uid : null;
+  state.minLevel = Math.min(...tasks.filter(t=>!t.blank).map(t=>t.level||0));
 
   const dated = tasks.filter(t=>t.s&&t.f&&!t.blank);
   const min = Math.min(...dated.map(t=>t.s)), max = Math.max(...dated.map(t=>t.f));
@@ -354,14 +355,14 @@ function matches(t){
   return true;
 }
 function visibleRows(){
-  const tasks = state.data.tasks.filter(t=>t.uid!==state.rootUid);
+  const tasks = state.data.tasks;
   const filtering = state.q.trim() || state.filter!=='all';
   if(filtering){
     const show = new Map();
     for(const t of tasks){
       if(t.blank || !matches(t)) continue;
       show.set(t.uid,'hit');
-      let p = t.parent; while(p!=null && p!==state.rootUid){ if(!show.has(p)) show.set(p,'ctx'); p = state.byUid.get(p)?.parent; }
+      let p = t.parent; while(p!=null){ if(!show.has(p)) show.set(p,'ctx'); p = state.byUid.get(p)?.parent; }
     }
     return tasks.filter(t=>show.has(t.uid)).map(t=>({t,ctx:show.get(t.uid)==='ctx'}));
   }
@@ -388,9 +389,8 @@ function hl(s){
 function render(){
   const rows = visibleRows(); state.rows = rows;
   const W = X(state.t1), H = rows.length * 30;
-  const baseLevel = state.rootUid!=null ? 1 : 0;
   const z = state.zoom, now = today();
-  $('#count').textContent = `${rows.filter(r=>!r.t.blank && !r.ctx).length} of ${state.data.tasks.filter(t=>!t.blank && t.uid!==state.rootUid).length} rows`;
+  $('#count').textContent = `${rows.filter(r=>!r.t.blank && !r.ctx).length} of ${state.data.tasks.filter(t=>!t.blank).length} rows`;
 
   // scale
   let t1='', t2='', bg='';
@@ -425,7 +425,7 @@ function render(){
   let html = '';
   rows.forEach(({t,ctx},i)=>{
     if(t.blank){ html += `<div class="row blank" aria-hidden="true"><div class="left"></div><div class="lane" style="width:${W}px"></div></div>`; return; }
-    const lvl = Math.max(0,t.level-baseLevel-1);
+    const lvl = Math.max(0,(t.level||0)-state.minLevel);
     const hasKids = state.kids.has(t.uid);
     const filtering = state.q.trim() || state.filter!=='all';
     const open = !state.collapsed.has(t.uid);

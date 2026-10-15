@@ -527,6 +527,7 @@ function readMPP(root, fileName) {
     for (const [name, off, m] of flags.meta2) if (meta2) t[name] = !!(getInt(meta2, off) & m);
     t.uid = uid; t.id = id;
     t.manual = !!t.TASK_MODE;
+    { const o = fm.offset('ACTUAL_DURATION_UNITS'); t.estimated = o >= 0 && (getShort(data, o) & 0x20) !== 0; }
     if (t.START == null || (t.SCHEDULED_START != null && !t.manual)) t.START = t.SCHEDULED_START;
     if (t.FINISH == null || (t.SCHEDULED_FINISH != null && !t.manual)) t.FINISH = t.SCHEDULED_FINISH;
     t.DURATION = t.SCHEDULED_DURATION;
@@ -696,7 +697,7 @@ function finish(project, list, resources, pp, autoWBS) {
     return {
       uid: t.uid, id: t.id, parent: t.parentTask && !t.parentTask.isNull ? t.parentTask.uid : null,
       wbs: t.WBS || null, outline: t.outline || null, level: t.OUTLINE_LEVEL || 0,
-      name: t.NAME || null, blank: false, summary: t.summary, milestone: !!t.MILESTONE, critical,
+      name: t.NAME || null, blank: false, summary: t.summary, milestone: !!t.MILESTONE, critical, estimated: !!t.estimated,
       manual: t.manual, active: t.ACTIVE !== false, external: !!t.external,
       start: iso(t.START), finish: iso(t.FINISH),
       duration: durStr(dur), durationDays: durMin == null ? null : durMin / pp.minutesPerDay,
@@ -758,7 +759,7 @@ function readXML(text, fileName) {
     list.push({
       uid: num(t, 'UID'), id: num(t, 'ID'), wbs: txt(t, 'WBS'), outline: txt(t, 'OutlineNumber'), level: num(t, 'OutlineLevel') || 0,
       name: txt(t, 'Name'), blank: false, summary: txt(t, 'Summary') === '1', milestone: txt(t, 'Milestone') === '1',
-      critical: txt(t, 'Critical') === '1', manual: txt(t, 'Manual') === '1', active: txt(t, 'Active') !== '0',
+      critical: txt(t, 'Critical') === '1', manual: txt(t, 'Manual') === '1', active: txt(t, 'Active') !== '0', estimated: txt(t, 'Estimated') === '1',
       start: date(t, 'Start'), finish: date(t, 'Finish'), duration: ds(days(durMin)), durationDays: days(durMin),
       pct: num(t, 'PercentComplete') || 0, actualStart: date(t, 'ActualStart'), actualFinish: date(t, 'ActualFinish'),
       baselineStart: date(base0, 'Start'), baselineFinish: date(base0, 'Finish'),
