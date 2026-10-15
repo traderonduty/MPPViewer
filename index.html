@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F4; --sheet:#FFFFFF; --ink:#1C2A33; --ink-2:#4F5F68; --ink-3:#7F8C92;
+  --rule:#DCE3E2; --rule-2:#EBF0EF; --weekend:#EEF2F1;
+  --teal-d:#0E5E6F; --teal:#3A8FA3; --teal-l:#BFDDE4;
+  --crit:#C2452D; --crit-l:#F1C9C0; --today:#D99A00; --sel:#E2EFF2;
+  --row:30px; --left:700px;
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--sans);font-variant-numeric:tabular-nums;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal-d);outline-offset:2px}
+
+/* ---------- top bar ---------- */
+header.top{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--rule);background:var(--sheet);min-height:64px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;white-space:nowrap}
+.brand svg{flex:none}
+.proj{display:none;flex-direction:column;min-width:0;padding-left:16px;border-left:1px solid var(--rule)}
+.proj h1{margin:0;font-size:20px;line-height:1.2;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj .file{color:var(--ink-3);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facts{display:none;gap:22px;margin-left:auto;flex-wrap:wrap}
+.fact{display:flex;flex-direction:column}
+.fact b{font-size:17px;font-weight:600;line-height:1.2}
+.fact span{font-size:12px;color:var(--ink-3)}
+.loaded .proj,.loaded .facts{display:flex}
+.btn.openbtn{display:none}.loaded .btn.openbtn{display:inline-flex}
+
+/* ---------- drop zone ---------- */
+#empty{flex:1;display:grid;place-items:center;padding:24px}
+.drop{width:min(640px,100%);border:2px dashed #AFC0BF;border-radius:14px;background:var(--sheet);padding:56px 32px;text-align:center;transition:border-color .15s,background .15s}
+.drop.over,body.dragging .drop{border-color:var(--teal-d);background:#F5FAFB}
+.drop h2{margin:18px 0 6px;font-size:24px;font-weight:600;letter-spacing:-.015em}
+.drop p{margin:0 auto;color:var(--ink-2);max-width:44ch}
+.drop .types{margin-top:22px;font-size:12.5px;color:var(--ink-3)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--rule);background:var(--sheet);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#B8C6C5;background:#F8FAFA}
+.btn.primary{background:var(--teal-d);border-color:var(--teal-d);color:#fff;padding:10px 18px;font-weight:500}
+.btn.primary:hover{background:#0B4E5D}
+.drop .btn.primary{margin-top:24px}
+.err{margin-top:18px;color:var(--crit);font-weight:500}
+.busy{display:none;margin-top:22px;color:var(--ink-2)}
+.drop.loading .busy{display:block}.drop.loading .btn{display:none}
+.cell-anim{display:inline-block;width:52px;height:20px;border:2px solid var(--teal-d);border-radius:4px;position:relative;vertical-align:middle;margin-right:10px}
+.cell-anim::after{content:"";position:absolute;right:-6px;top:4px;width:4px;height:8px;background:var(--teal-d);border-radius:0 2px 2px 0}
+.cell-anim i{position:absolute;inset:2px auto 2px 2px;background:var(--teal);border-radius:1px;animation:charge 1.4s ease-in-out infinite}
+@keyframes charge{0%{width:0}100%{width:calc(100% - 4px)}}
+
+/* ---------- toolbar ---------- */
+#app{display:none;flex:1;min-height:0;flex-direction:column}
+.loaded #app{display:flex}.loaded #empty{display:none}
+.toolbar{display:flex;gap:6px;align-items:center;padding:10px 20px;flex-wrap:wrap;border-bottom:1px solid var(--rule);background:var(--paper)}
+.search{position:relative;flex:0 1 280px;min-width:180px}
+.search input{width:100%;border:1px solid var(--rule);border-radius:7px;padding:6px 10px 6px 32px;background:var(--sheet)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+select{border:1px solid var(--rule);border-radius:7px;padding:6px 8px;background:var(--sheet)}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--sheet)}
+.seg button{border:0;background:none;padding:6px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.spacer{flex:1}
+.check{display:inline-flex;gap:6px;align-items:center;cursor:pointer;user-select:none;color:var(--ink-2)}
+.check input{accent-color:var(--teal-d)}
+.count{color:var(--ink-3);font-size:12.5px}
+
+/* ---------- board ---------- */
+.board{flex:1;min-height:0;overflow:auto;position:relative;background:var(--sheet)}
+.sheet{position:relative}
+.hrow{position:sticky;top:0;z-index:5;display:flex;height:52px;background:var(--sheet);border-bottom:1px solid var(--rule)}
+.hleft{position:sticky;left:0;z-index:6;flex:none;width:var(--left);display:grid;align-items:end;background:var(--sheet);border-right:1px solid var(--rule)}
+.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 84px 106px 106px 50px}
+.hleft .cols>div{padding:0 8px 7px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.hleft .cols>div.r,.row .r{text-align:right}
+.scale{position:relative;flex:none;height:52px}
+.scale .t1,.scale .t2{position:absolute;left:0;right:0;height:26px}
+.scale .t1{top:0;border-bottom:1px solid var(--rule-2)}.scale .t2{top:26px}
+.scale span{position:absolute;top:0;height:26px;line-height:26px;padding-left:6px;font-size:12px;color:var(--ink-2);border-left:1px solid var(--rule-2);white-space:nowrap;overflow:hidden}
+.scale .t1 span{font-weight:500;color:var(--ink)}
+.scale .t2 span{font-size:11.5px}
+.scale .t2 span.we{color:var(--ink-3)}
+
+.rows{position:relative}
+.row{display:flex;height:var(--row);border-bottom:1px solid var(--rule-2);cursor:pointer}
+.row .left{position:sticky;left:0;z-index:3;flex:none;width:var(--left);background:var(--sheet);border-right:1px solid var(--rule)}
+.row .cols{height:100%;align-items:center}
+.row .cols>div{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.row .idc{color:var(--ink-3);font-size:12px}
+.row .nm{display:flex;align-items:center;gap:4px}
+.row .nm .lbl{overflow:hidden;text-overflow:ellipsis}
+.row.sum .nm{font-weight:600}
+.row.sum.l1 .nm{text-transform:none}
+.row:hover .left,.row:hover .lane{background:#F7FAFA}
+.row.sel .left,.row.sel .lane{background:var(--sel)}
+.row.ctx .nm .lbl{color:var(--ink-3)}
+.row.blank{cursor:default}
+.row.blank .left{background:var(--sheet)}
+.caret{flex:none;width:20px;height:20px;border:0;background:none;padding:0;display:grid;place-items:center;cursor:pointer;border-radius:4px;color:var(--ink-2)}
+.caret:hover{background:var(--rule-2)}
+.caret svg{transition:transform .15s}
+.caret[aria-expanded=false] svg{transform:rotate(-90deg)}
+.caret.none{visibility:hidden}
+.tag{flex:none;font-size:10.5px;font-weight:600;padding:0 5px;border-radius:3px;line-height:16px}
+.tag.crit{background:var(--crit-l);color:#8E2E1B}
+.tag.man{border:1px dashed var(--ink-3);color:var(--ink-2);font-weight:500}
+.lane{position:relative;flex:none;height:100%}
+mark{background:#FCE9B2;color:inherit;border-radius:2px}
+
+/* grid lines + weekends + today live behind the rows */
+.bg{position:absolute;top:52px;bottom:0;z-index:0;pointer-events:none}
+.bg i{position:absolute;top:0;bottom:0}
+.bg i.we{background:var(--weekend)}
+.bg i.ln{width:1px;background:var(--rule-2)}
+.bg i.today{width:2px;background:var(--today);z-index:2}
+.rows,.hrow{z-index:1}
+.row .lane{background:transparent}
+
+/* bars */
+.bar{position:absolute;top:8px;height:14px;border-radius:3px;background:var(--teal-l);border:1.5px solid var(--teal);overflow:visible}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:1px}
+.bar::after{content:"";position:absolute;right:-4.5px;top:3px;width:3px;height:5px;background:var(--teal);border-radius:0 1.5px 1.5px 0}
+.bar.crit{background:var(--crit-l);border-color:var(--crit)}
+.bar.crit .fill,.bar.crit::after{background:var(--crit)}
+.bar.man{border-style:dashed}
+.bar.sumbar{top:10px;height:8px;border:0;border-radius:0;background:var(--teal-d)}
+.bar.sumbar::after{display:none}
+.bar.sumbar::before{content:"";position:absolute;inset:8px 0 auto 0;height:5px;border-left:2px solid var(--teal-d);border-right:2px solid var(--teal-d)}
+.bar.sumbar.crit{background:var(--crit)}
+.bar.sumbar.man{background:repeating-linear-gradient(90deg,var(--teal-d) 0 6px,#6E9EA8 6px 9px)}
+.bar.sumbar .fill{display:none}
+.ms{position:absolute;top:8px;width:13px;height:13px;transform:translateX(-6.5px) rotate(45deg);background:var(--ink)}
+.ms.crit{background:var(--crit)}
+.rollup{position:absolute;top:23px;height:4px;background:repeating-linear-gradient(90deg,#8FB3BB 0 4px,transparent 4px 6px)}
+.base{position:absolute;top:24px;height:3px;background:#A9B5B9;border-radius:2px}
+.blabel{position:absolute;top:6px;font-size:12px;color:var(--ink-2);white-space:nowrap;pointer-events:none}
+svg.links{position:absolute;top:52px;z-index:1;pointer-events:none;overflow:visible}
+svg.links path{fill:none;stroke:#6C7C83;stroke-width:1.2}
+svg.links path.crit{stroke:var(--crit)}
+svg.links path.ah{fill:#6C7C83;stroke:none}svg.links path.ah.crit{fill:var(--crit)}
+
+/* tooltip */
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:#fff;border-radius:7px;padding:8px 10px;font-size:12.5px;max-width:320px;box-shadow:0 6px 20px rgba(28,42,51,.25);display:none}
+.tip b{display:block;font-weight:600;margin-bottom:2px}
+.tip span{color:#B9C6CB}
+
+/* detail drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--sheet);border-left:1px solid var(--rule);box-shadow:-12px 0 32px rgba(28,42,51,.12);z-index:40;transform:translateX(100%);transition:transform .2s ease;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer header{display:flex;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid var(--rule)}
+.drawer h3{margin:0;font-size:17px;line-height:1.3;font-weight:600;flex:1}
+.drawer .wbs{color:var(--ink-3);font-size:12.5px;margin-bottom:3px}
+.drawer .body{overflow:auto;padding:16px 20px 28px}
+.drawer dl{display:grid;grid-template-columns:120px 1fr;gap:7px 12px;margin:0}
+.drawer dt{color:var(--ink-3)}
+.drawer dd{margin:0}
+.drawer h4{margin:22px 0 8px;font-size:13px;font-weight:600}
+.drawer ul{list-style:none;margin:0;padding:0}
+.drawer li button{width:100%;text-align:left;border:1px solid var(--rule);background:none;border-radius:6px;padding:6px 9px;margin-bottom:5px;cursor:pointer;display:flex;gap:8px}
+.drawer li button:hover{background:#F7FAFA}
+.drawer li .rt{margin-left:auto;color:var(--ink-3);font-size:12px;white-space:nowrap}
+.drawer .notes{white-space:pre-wrap;background:var(--paper);border-radius:6px;padding:10px 12px}
+.drawer .none{color:var(--ink-3)}
+.x{border:0;background:none;width:30px;height:30px;border-radius:6px;cursor:pointer;display:grid;place-items:center;color:var(--ink-2)}
+.x:hover{background:var(--rule-2)}
+.meter{height:8px;border-radius:4px;background:var(--teal-l);overflow:hidden;margin-top:6px;width:140px}
+.meter i{display:block;height:100%;background:var(--teal)}
+
+.hint{position:fixed;inset:0;z-index:60;background:rgba(14,94,111,.12);border:3px dashed var(--teal-d);display:none;place-items:center;font-size:20px;font-weight:600;color:var(--teal-d)}
+body.dragging.loaded .hint{display:grid}
+
+@media (max-width:900px){
+  :root{--left:300px}
+  #expand,#collapse,.check,#today{display:none}
+  .cols{grid-template-columns:40px minmax(0,1fr) 60px}
+  .cols>div:nth-child(n+4){display:none}
+  .facts{margin-left:0;width:100%;gap:16px}
+  .proj{border-left:0;padding-left:0}
+  header.top,.toolbar{padding-left:16px;padding-right:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="26" height="18" viewBox="0 0 26 18" aria-hidden="true"><rect x="1" y="1" width="21" height="16" rx="3" fill="none" stroke="#0E5E6F" stroke-width="2"/><rect x="23" y="5.5" width="2.5" height="7" rx="1" fill="#0E5E6F"/><rect x="4" y="4" width="10" height="10" rx="1" fill="#3A8FA3"/></svg>
+    Project Viewer
+  </div>
+  <div class="proj"><h1 id="pTitle"></h1><div class="file" id="pFile"></div></div>
+  <div class="facts" id="facts"></div>
+  <button class="btn openbtn" id="another">Open another file</button>
+</header>
+
+<main id="empty">
+  <div class="drop" id="drop">
+    <svg width="78" height="52" viewBox="0 0 78 52" aria-hidden="true"><rect x="2" y="2" width="66" height="48" rx="6" fill="#fff" stroke="#0E5E6F" stroke-width="3"/><rect x="70" y="16" width="6" height="20" rx="2" fill="#0E5E6F"/><rect x="10" y="12" width="26" height="6" rx="2" fill="#0E5E6F"/><rect x="18" y="23" width="30" height="6" rx="2" fill="#3A8FA3"/><rect x="30" y="34" width="28" height="6" rx="2" fill="#C2452D"/></svg>
+    <h2>Drop a Microsoft Project file here</h2>
+    <p>See the task list, timeline and dependencies without opening Project. Your file is opened in this browser and is never uploaded anywhere.</p>
+    <button class="btn primary" id="pick">Choose a file</button>
+    <div class="busy"><span class="cell-anim"><i></i></span>Reading <span id="busyName"></span>…</div>
+    <div class="err" id="err" role="alert"></div>
+    <div class="types">.mpp files from Project 2010 or newer (including Microsoft 365), or Project XML (.xml) from any version</div>
+  </div>
+  <input type="file" id="file" hidden accept=".mpp,.mpt,.xml">
+</main>
+
+<section id="app">
+  <div class="toolbar">
+    <label class="search"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Search tasks" aria-label="Search tasks"></label>
+    <select id="filter" aria-label="Show">
+      <option value="all">All tasks</option>
+      <option value="critical">Critical tasks</option>
+      <option value="notstarted">Not started</option>
+      <option value="inprogress">In progress</option>
+      <option value="complete">Complete</option>
+      <option value="late">Should have finished by today</option>
+      <option value="manual">Manually scheduled</option>
+      <option value="links">Has dependencies</option>
+    </select>
+    <div class="seg" role="group" aria-label="Timeline scale">
+      <button data-z="day" aria-pressed="false">Days</button><button data-z="week" aria-pressed="true">Weeks</button><button data-z="month" aria-pressed="false">Months</button>
+    </div>
+    <button class="btn" id="expand">Expand all</button>
+    <button class="btn" id="collapse">Collapse all</button>
+    <label class="check"><input type="checkbox" id="showLinks" checked> Dependency lines</label>
+    <span class="count" id="count"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="today">Go to today</button>
+    <button class="btn" id="csv">Export CSV</button>
+  </div>
+  <div class="board" id="board"><div class="sheet" id="sheet"></div></div>
+</section>
+
+<aside class="drawer" id="drawer" aria-label="Task details" aria-hidden="true"></aside>
+<div class="tip" id="tip"></div>
+<div class="hint">Drop to open this file</div>
+
+<script>
+/*
+ * mpp-reader.js — reads Microsoft Project files in the browser, no server needed.
+ *
+ *   .mpp / .mpt  saved by Project 2010, 2013, 2016, 2019, 2021 and Microsoft 365 ("MPP14" format)
+ *   .xml         Microsoft Project XML (any version; use File > Save As > XML in Project)
+ *
+ * The .mpp decoding is a JavaScript port of the relevant parts of MPXJ
+ * (https://www.mpxj.org, Copyright Jon Iles, GNU LGPL 2.1). This file is
+ * therefore distributed under the GNU Lesser General Public License v2.1.
+ *
+ * Usage:  const project = await MPPReader.read(file)   // File or Blob
+ *         MPPReader.readBuffer(arrayBuffer, fileName)
+ * Returns { project, tasks, resources } (see shape at the bottom of the file).
+ */
+(function (global) {
+'use strict';
+
+/* Generated from MPXJ field definitions */
+const TASK_FIELDS={"0":["WORK","WORK",null],"5":["COST","CURRENCY",null],"14":["NAME","STRING",null],"15":["NOTES","NOTES",null],"16":["WBS","STRING",null],"17":["CONSTRAINT_TYPE","CONSTRAINT",null],"23":["ID","INTEGER",null],"26":["SUBPROJECT_FILE","STRING",null],"29":["SCHEDULED_DURATION","DURATION","ACTUAL_DURATION_UNITS"],"32":["PERCENT_COMPLETE","PERCENTAGE",null],"35":["SCHEDULED_START","DATE",null],"36":["SCHEDULED_FINISH","DATE",null],"37":["EARLY_START","DATE",null],"38":["EARLY_FINISH","DATE",null],"39":["LATE_START","DATE",null],"40":["LATE_FINISH","DATE",null],"41":["ACTUAL_START","DATE",null],"42":["ACTUAL_FINISH","DATE",null],"43":["BASELINE_ESTIMATED_START","DATE",null],"44":["BASELINE_ESTIMATED_FINISH","DATE",null],"85":["OUTLINE_LEVEL","SHORT",null],"86":["UNIQUE_ID","INTEGER",null],"93":["CREATED","DATE",null],"94":["NOTES","NOTES",null],"152":["DURATION_UNITS","TIME_UNITS",null],"160":["PARENT_TASK_UNIQUE_ID","INTEGER",null],"179":["BASELINE_DURATION_UNITS","TIME_UNITS",null],"181":["ACTUAL_DURATION_UNITS","TIME_UNITS",null],"249":["OUTLINE_LEVEL","SHORT",null],"255":["SUBPROJECT_TASK_ID","INTEGER",null],"438":["START_SLACK","DURATION","ACTUAL_DURATION_UNITS"],"439":["FINISH_SLACK","DURATION","ACTUAL_DURATION_UNITS"],"1283":["START","DATE",null],"1284":["FINISH","DATE",null],"1285":["START_TEXT","STRING",null],"1286":["FINISH_TEXT","STRING",null],"1287":["DURATION_TEXT","STRING",null],"1288":["MANUAL_DURATION","DURATION","MANUAL_DURATION_UNITS"],"1289":["MANUAL_DURATION_UNITS","TIME_UNITS",null],"1299":["BASELINE_START","DATE",null],"1300":["BASELINE_FINISH","DATE",null],"1301":["BASELINE_DURATION","DURATION","BASELINE_DURATION_UNITS"],"1338":["SCHEDULED_START","DATE",null],"1339":["SCHEDULED_FINISH","DATE",null],"1340":["SCHEDULED_DURATION","DURATION","ACTUAL_DURATION_UNITS"]};
+const RSC_FIELDS={"1":["NAME","STRING"],"27":["UNIQUE_ID","INTEGER"]};
+const ASSN_FIELDS={"0":["UNIQUE_ID","INTEGER"],"1":["TASK_UNIQUE_ID","INTEGER"],"2":["RESOURCE_UNIQUE_ID","INTEGER"]};
+const TASK_SIZES="0:8,1:8,2:8,3:4,4:8,5:8,6:8,7:8,8:8,9:8,10:8,11:8,12:8,13:8,17:2,18:4,19:2,20:4,21:4,22:4,23:4,24:2,25:2,27:4,28:4,29:4,30:4,31:4,32:2,33:2,34:2,35:4,36:4,37:4,38:4,39:4,40:4,41:4,42:4,43:4,44:4,45:4,46:4,52:4,53:4,55:4,56:4,58:4,59:4,61:4,62:4,64:4,65:4,71:2,72:2,73:2,74:2,75:2,76:2,77:2,78:2,79:2,80:2,81:2,82:2,83:8,85:2,86:4,92:2,93:4,98:2,99:4,100:4,101:4,103:4,104:4,105:4,106:8,107:8,108:8,109:2,110:2,111:2,119:4,120:8,128:2,129:2,132:2,152:2,160:4,163:4,164:8,165:8,166:4,168:8,169:8,170:8,178:2,179:2,181:2,183:2,184:2,185:2,200:2,202:2,224:2,225:2,232:2,242:4,246:2,249:2,250:2,251:2,252:2,253:2,255:4,258:8,259:8,260:8,261:8,262:8,263:8,264:8,265:4,266:4,267:4,268:4,269:4,270:4,271:4,272:4,273:4,274:4,275:4,276:4,277:4,278:4,279:4,280:4,281:4,282:4,283:4,284:4,285:4,286:4,287:4,288:4,289:4,290:4,291:4,292:2,293:2,294:2,295:2,296:2,297:2,298:2,299:2,300:2,301:2,337:2,338:2,339:2,340:2,341:2,342:2,343:2,360:4,369:4,370:4,372:4,387:4,396:2,399:2,401:4,403:2,404:2,405:2,406:2,407:2,408:2,409:2,410:2,411:2,412:2,413:2,417:4,419:4,421:4,423:4,425:4,427:4,429:4,431:4,433:4,435:4,437:4,438:4,439:4,441:8,458:4,480:8,482:4,483:4,484:8,485:8,487:4,488:2,489:8,493:4,494:4,495:8,496:8,498:4,499:2,500:8,504:4,505:4,506:8,507:8,509:4,510:2,511:8,515:4,516:4,517:8,518:8,520:4,521:2,522:8,526:4,527:4,528:8,529:8,531:4,532:2,533:8,539:2,540:2,541:8,544:4,545:4,546:8,547:8,549:4,550:2,551:8,555:4,556:4,557:8,558:8,560:4,561:2,562:8,566:4,567:4,568:8,569:8,571:4,572:2,573:8,577:4,578:4,579:8,580:8,582:4,583:2,584:8,588:4,589:4,590:8,591:8,593:4,594:2,595:8,599:8,600:8,601:8,602:8,603:8,604:8,605:8,606:8,607:8,608:8,609:4,610:4,611:4,612:4,613:4,614:4,615:4,616:4,617:4,618:4,619:4,620:4,621:4,622:4,623:4,624:4,625:4,626:4,627:4,628:4,629:4,630:4,631:4,632:4,633:4,634:4,635:4,636:4,637:4,638:4,639:4,640:4,641:4,642:4,643:4,644:4,645:4,646:4,647:4,648:4,649:2,650:2,651:2,652:2,653:2,654:2,655:2,656:2,657:2,658:2,659:2,660:2,661:2,662:2,663:2,664:2,665:2,666:2,667:2,668:2,669:2,670:2,671:2,672:2,673:2,674:2,675:2,676:2,677:2,678:2,839:2,840:2,841:2,842:2,843:2,844:2,845:2,846:2,847:2,848:2,849:8,850:8,851:8,852:8,853:8,854:8,855:8,856:8,857:8,858:8,859:4,860:4,861:4,862:4,863:4,864:4,865:4,866:4,867:4,868:4,869:4,870:4,871:4,872:4,873:4,874:4,875:4,876:4,877:4,878:4,879:4,880:4,881:4,882:4,883:4,884:4,885:4,886:4,887:4,888:4,889:4,890:4,891:4,892:4,893:4,894:4,895:4,896:4,897:4,898:4,969:2,970:2,971:2,972:2,973:2,974:2,975:2,976:2,977:2,978:2,979:2,980:2,981:2,982:2,983:2,984:2,985:2,986:2,987:2,988:2,1119:2,1122:2,1139:8,1140:8,1143:16,1144:16,1146:16,1152:4,1153:4,1165:2,1169:16,1171:8,1172:8,1173:2,1174:4,1175:4,1176:8,1177:8,1180:2,1181:4,1182:4,1183:8,1184:8,1187:2,1188:4,1189:4,1190:8,1191:8,1194:2,1195:4,1196:4,1197:8,1198:8,1201:2,1202:4,1203:4,1204:8,1205:8,1208:2,1209:4,1210:4,1211:8,1212:8,1215:2,1216:4,1217:4,1218:8,1219:8,1222:2,1223:4,1224:4,1225:8,1226:8,1229:2,1230:4,1231:4,1232:8,1233:8,1236:2,1237:4,1238:4,1239:8,1240:8,1243:2,1244:4,1245:4,1246:8,1247:8,1250:2,1279:2,1281:2,1282:2,1283:4,1284:4,1288:4,1289:2,1295:2,1296:2,1297:2,1299:4,1300:4,1301:4,1302:4,1303:4,1304:4,1305:4,1306:4,1307:4,1308:4,1309:4,1310:4,1311:4,1312:4,1313:4,1314:4,1315:4,1316:4,1317:4,1318:4,1319:4,1320:4,1321:4,1322:4,1323:4,1324:4,1325:4,1326:4,1327:4,1328:4,1329:4,1330:4,1331:4,1332:2,1335:8,1338:4,1339:4,1340:4,1381:2,1382:2,1383:2,1384:2,1410:4,1411:4,1412:4,1413:4";
+const RSC_SIZES="0:4,4:8,6:8,7:8,11:8,12:8,13:8,14:8,15:8,16:8,17:8,18:8,19:2,21:8,22:8,23:4,24:8,25:2,26:8,27:4,29:2,34:2,38:8,39:8,40:8,47:8,48:8,49:8,51:8,52:8,53:8,54:8,57:4,58:4,70:2,71:2,102:4,103:4,104:4,105:4,106:4,107:4,108:4,109:4,110:4,111:4,117:4,118:4,119:4,120:2,121:2,122:2,123:8,124:8,125:8,126:2,127:2,128:2,129:2,130:2,131:2,132:2,133:2,134:2,135:2,144:2,152:4,163:2,166:8,167:8,168:8,169:8,170:8,171:8,172:8,173:4,174:4,175:4,176:4,177:4,178:4,179:4,180:4,181:4,182:4,183:4,184:4,185:4,186:4,187:4,188:4,189:4,190:4,191:4,192:4,193:4,194:4,195:2,196:2,197:2,198:2,199:2,200:2,201:2,202:2,203:2,204:2,220:4,221:4,222:4,223:4,224:4,245:2,246:2,247:2,248:2,249:2,250:2,251:2,253:4,257:2,258:8,259:4,260:4,261:2,262:4,263:4,264:2,265:4,266:2,267:2,268:8,269:2,270:4,271:4,272:2,279:4,281:4,283:4,285:4,287:4,289:4,291:4,293:4,295:4,297:4,301:8,306:2,342:8,343:8,348:4,349:4,352:8,353:8,358:4,359:4,362:8,363:8,368:4,369:4,372:8,373:8,378:4,379:4,382:8,383:8,388:4,389:4,392:8,393:8,398:4,399:4,402:8,403:8,408:4,409:4,412:8,413:8,418:4,419:4,422:8,423:8,428:4,429:4,432:8,433:8,438:4,439:4,443:4,446:8,447:8,448:8,449:8,450:8,451:8,452:8,453:8,454:8,455:8,456:4,457:4,458:4,459:4,460:4,461:4,462:4,463:4,464:4,465:4,466:4,467:4,468:4,469:4,470:4,471:4,472:4,473:4,474:4,475:4,476:4,477:4,478:4,479:4,480:4,481:4,482:4,483:4,484:4,485:4,486:4,487:4,488:4,489:4,490:4,491:4,492:4,493:4,494:4,495:4,496:2,497:2,498:2,499:2,500:2,501:2,502:2,503:2,504:2,505:2,506:2,507:2,508:2,509:2,510:2,511:2,512:2,513:2,514:2,515:2,516:2,517:2,518:2,519:2,520:2,521:2,522:2,523:2,524:2,525:2,686:2,687:2,688:2,691:2,692:2,694:4,695:2,696:2,720:8,721:8,726:4,728:16,729:16,752:2,753:8,754:8,755:2,756:8,757:8,760:8,761:8,764:8,765:8,768:8,769:8,772:8,773:8,776:8,777:8,780:8,781:8,784:8,785:8,788:8,789:8,792:8,793:8,796:8,797:8,800:2,808:2,853:4,856:4,859:8";
+const ASSN_SIZES="0:4,1:4,2:4,3:4,4:4,7:8,8:8,9:8,10:8,11:8,12:8,13:8,14:8,16:8,19:8,20:4,21:4,22:4,23:4,24:4,25:2,26:8,27:8,28:8,29:8,30:8,31:8,32:8,34:8,35:8,36:8,37:8,38:8,43:2,55:2,72:2,73:2,74:2,75:2,80:2,98:4,99:4,100:4,101:4,102:4,103:4,104:4,105:4,106:4,107:4,113:4,114:4,115:4,116:2,117:2,118:2,119:8,120:8,121:8,122:2,123:2,124:2,125:2,126:2,127:2,128:2,129:2,130:2,131:2,132:2,135:2,145:4,146:4,147:4,159:8,160:8,161:8,162:8,163:8,164:8,165:8,166:4,167:4,168:4,169:4,170:4,171:4,172:4,173:4,174:4,175:4,176:4,177:4,178:4,179:4,180:4,181:4,182:4,183:4,184:4,185:4,186:4,187:4,188:2,189:2,190:2,191:2,192:2,193:2,194:2,195:2,196:2,197:2,213:4,214:4,215:4,216:4,217:4,238:2,239:2,240:2,241:2,242:2,243:2,244:2,246:4,247:8,248:8,262:4,263:4,264:4,270:1,271:8,289:8,290:8,295:4,296:4,298:8,299:8,304:4,305:4,307:8,308:8,313:4,314:4,316:8,317:8,322:4,323:4,325:8,326:8,331:4,332:4,334:8,335:8,340:4,341:4,343:8,344:8,349:4,350:4,352:8,353:8,358:4,359:4,361:8,362:8,367:4,368:4,370:8,371:8,376:4,377:4,381:8,382:8,383:8,384:8,385:8,386:8,387:8,388:8,389:8,390:8,391:4,392:4,393:4,394:4,395:4,396:4,397:4,398:4,399:4,400:4,401:4,402:4,403:4,404:4,405:4,406:4,407:4,408:4,409:4,410:4,411:4,412:4,413:4,414:4,415:4,416:4,417:4,418:4,419:4,420:4,421:4,422:4,423:4,424:4,425:4,426:4,427:4,428:4,429:4,430:4,441:2,442:2,443:2,444:2,445:2,446:2,447:2,448:2,449:2,450:2,451:2,452:2,453:2,454:2,455:2,456:2,457:2,458:2,459:2,460:2,605:2,630:8,631:8,634:4,636:16,637:16,638:16,669:8,670:8,673:8,674:8,677:8,678:8,681:8,682:8,685:8,686:8,689:8,690:8,693:8,694:8,697:8,698:8,701:8,702:8,705:8,706:8,709:8,710:8,713:8,714:8";
+
+
+class ReadError extends Error {}
+
+/* ------------------------------------------------------------------ bytes */
+const u8 = (b, o) => (o >= 0 && o < b.length ? b[o] : 0);
+const getShort = (b, o) => u8(b, o) | (u8(b, o + 1) << 8);                         // unsigned 16
+const getInt = (b, o) => (u8(b, o) | (u8(b, o + 1) << 8) | (u8(b, o + 2) << 16) | (u8(b, o + 3) << 24)); // signed 32
+function getLong(b, o) {                                                           // signed 64 as BigInt
+  let r = 0n;
+  for (let i = 7; i >= 0; i--) r = (r << 8n) | BigInt(u8(b, o + i));
+  return BigInt.asIntN(64, r);
+}
+function getDouble(b, o) {
+  if (o < 0 || o + 8 > b.length) return 0;
+  const v = new DataView(b.buffer, b.byteOffset + o, 8).getFloat64(0, true);
+  return Number.isNaN(v) ? 0 : v;
+}
+const pad = (b, size) => { const n = new Uint8Array(size); n.set(b.subarray(0, Math.min(b.length, size))); return n; };
+function unicodeString(b, o = 0) {
+  if (!b || o >= b.length) return '';
+  let end = b.length;
+  for (let i = o; i < b.length - 1; i += 2) if (b[i] === 0 && b[i + 1] === 0) { end = i; break; }
+  return new TextDecoder('utf-16le').decode(b.subarray(o, end - ((end - o) % 2)));
+}
+function asciiString(b, o = 0) {
+  let s = '';
+  for (let i = o; i < b.length && b[i] !== 0; i++) s += String.fromCharCode(b[i]);
+  return s;
+}
+
+/* ------------------------------------------------- compound file (OLE2) */
+function readCFB(buffer) {
+  const b = new Uint8Array(buffer);
+  const sig = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+  if (b.length < 512 || sig.some((v, i) => b[i] !== v)) return null;
+  const dv = new DataView(buffer);
+  const u32 = o => dv.getUint32(o, true);
+  const ssz = 1 << dv.getUint16(0x1E, true), mssz = 1 << dv.getUint16(0x20, true);
+  const nFat = u32(0x2C), dirStart = u32(0x30), cutoff = u32(0x38), mfStart = u32(0x3C), difStart = u32(0x44), nDif = u32(0x48);
+  const END = 0xFFFFFFFA;
+  const secOff = s => (s + 1) * ssz;
+  const fatSecs = [];
+  for (let i = 0; i < 109; i++) { const v = u32(0x4C + i * 4); if (v < END) fatSecs.push(v); }
+  for (let d = difStart, k = 0; k < nDif && d < END && secOff(d) + ssz <= b.length; k++) {
+    for (let j = 0; j < ssz / 4 - 1; j++) { const v = u32(secOff(d) + j * 4); if (v < END) fatSecs.push(v); }
+    d = u32(secOff(d) + ssz - 4);
+  }
+  const fat = new Uint32Array(fatSecs.length * ssz / 4);
+  fatSecs.slice(0, Math.max(nFat, 0) || fatSecs.length).forEach((s, i) => {
+    const o = secOff(s); if (o + ssz <= b.length) fat.set(new Uint32Array(buffer.slice(o, o + ssz)), i * ssz / 4);
+  });
+  const chain = (start, table) => {
+    const out = []; const seen = new Set();
+    for (let s = start; s < END && s < table.length && !seen.has(s); s = table[s]) { seen.add(s); out.push(s); }
+    return out;
+  };
+  const readBig = (start, size) => {
+    const secs = chain(start, fat), out = new Uint8Array(size == null ? secs.length * ssz : size);
+    let p = 0;
+    for (const s of secs) { if (p >= out.length) break; const o = secOff(s); const n = Math.min(ssz, out.length - p); out.set(b.subarray(o, o + n), p); p += n; }
+    return out;
+  };
+  const dirBytes = readBig(dirStart, null);
+  const entries = [];
+  for (let o = 0; o + 128 <= dirBytes.length; o += 128) {
+    const e = dirBytes.subarray(o, o + 128), edv = new DataView(e.buffer, e.byteOffset, 128);
+    const nl = edv.getUint16(64, true);
+    entries.push({
+      name: nl > 2 ? new TextDecoder('utf-16le').decode(e.subarray(0, nl - 2)) : '',
+      type: e[66], left: edv.getUint32(68, true), right: edv.getUint32(72, true), child: edv.getUint32(76, true),
+      start: edv.getUint32(116, true), size: edv.getUint32(120, true)
+    });
+  }
+  const root = entries[0];
+  if (!root || root.type !== 5) throw new ReadError("The file's internal structure is damaged.");
+  const mini = readBig(root.start, root.size);
+  const miniFatBytes = mfStart < END ? readBig(mfStart, null) : new Uint8Array(0);
+  const miniFat = new Uint32Array(miniFatBytes.buffer, miniFatBytes.byteOffset, miniFatBytes.length >> 2);
+  const readMini = (start, size) => {
+    const out = new Uint8Array(size); let p = 0;
+    for (const s of chain(start, miniFat)) { if (p >= size) break; const o = s * mssz, n = Math.min(mssz, size - p); out.set(mini.subarray(o, o + n), p); p += n; }
+    return out;
+  };
+  const node = idx => {
+    const e = entries[idx];
+    const n = { name: e.name, isDir: e.type === 1 || e.type === 5, children: new Map() };
+    if (e.type === 2) n.data = () => (e.size < cutoff ? readMini(e.start, e.size) : readBig(e.start, e.size));
+    if (n.isDir && e.child < entries.length) {
+      const stack = [e.child], seen = new Set();
+      while (stack.length) {
+        const c = stack.pop();
+        if (c >= entries.length || seen.has(c)) continue; seen.add(c);
+        const ce = entries[c];
+        if (ce.type) n.children.set(ce.name, c);
+        stack.push(ce.left, ce.right);
+      }
+      n.get = name => (n.children.has(name) ? node(n.children.get(name)) : null);
+    }
+    return n;
+  };
+  return node(0);
+}
+
+/* ------------------------------------------------------------ structures */
+function props14(b) {
+  const m = new Map(); if (!b) return m;
+  const count = getShort(b, 12); let p = 16, found = 0;
+  while (found < count) {
+    if (b.length - p < 12) break;
+    const size = getInt(b, p), key = getInt(b, p + 4); p += 12;
+    if (b.length - p < size || size < 1) break;
+    m.set(key, b.subarray(p, p + size)); p += size; found++;
+    if (size % 2) p++;
+  }
+  return m;
+}
+const P = {
+  PASSWORD_FLAG: 893386752, PROTECTION_PASSWORD_HASH: 893386756, ENCRYPTION_CODE: 893386759,
+  TASK_FIELD_MAP: 131092, TASK_FIELD_MAP2: 50331668, RESOURCE_FIELD_MAP: 131093, RESOURCE_FIELD_MAP2: 50331669,
+  ASSIGNMENT_FIELD_MAP: 131095, ASSIGNMENT_FIELD_MAP2: 50331671,
+  DURATION_UNITS: 37748757, MINUTES_PER_DAY: 37748765, MINUTES_PER_WEEK: 37748766, DAYS_PER_MONTH: 37753743,
+  CRITICAL_SLACK_LIMIT: 37748756, PROJECT_START_DATE: 37748738, PROJECT_FINISH_DATE: 37748739, STATUS_DATE: 37748805,
+  TITLE: 37748744, AUTHOR: 37748748, MANAGER: 37748737, COMPANY: 37748736
+};
+const pShort = (m, k) => (m.get(k) ? getShort(m.get(k), 0) : 0);
+const pInt = (m, k) => (m.get(k) ? getInt(m.get(k), 0) : 0);
+
+const FIXED_MAGIC = 0xFADFADBA | 0;
+function fixedMeta(b, sizeProvider) {
+  if (getInt(b, 0) !== FIXED_MAGIC) throw new ReadError('Unexpected data block in the file.');
+  const itemCount = getInt(b, 8);
+  const itemSize = typeof sizeProvider === 'number' ? sizeProvider : sizeProvider(b.length, itemCount);
+  const adjusted = Math.max(0, Math.floor((b.length - 16) / itemSize));
+  const items = [];
+  for (let i = 0; i < adjusted; i++) items.push(b.subarray(16 + i * itemSize, 16 + (i + 1) * itemSize));
+  return { itemCount, adjusted, items, get: i => (i >= 0 && i < items.length ? items[i] : null) };
+}
+function fixedMetaMatching(b, other, sizes) {
+  return fixedMeta(b, (fileSize, itemCount) => {
+    let itemSize = sizes[0], distance = -Infinity; const available = fileSize - 16;
+    for (const t of sizes) {
+      if (available % t === 0) {
+        if (available / t === other.count) { itemSize = t; break; }
+        const d = itemCount * t - available;
+        if (d <= 0 && d > distance) { itemSize = t; distance = d; }
+      }
+    }
+    return itemSize;
+  });
+}
+function makeFixed(items, offsets) {
+  return {
+    items, offsets, count: items.length,
+    get: i => (i >= 0 && i < items.length && items[i] ? items[i] : null),
+    valid: i => i != null && i >= 0 && i < items.length,
+    indexOf: off => offsets.indexOf(off)
+  };
+}
+function fixedData(meta, buf, maxExpected = 0, minSize = 0) {
+  const n = meta.adjusted, items = new Array(n).fill(null), offsets = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const off = getInt(meta.get(i), 4);
+    if (off < 0 || off > buf.length) continue;
+    let size = i + 1 === n ? buf.length - off : getInt(meta.get(i + 1), 4) - off;
+    if (size === 0) size = minSize;
+    const available = buf.length - off;
+    if (size < 0 || size > available) size = maxExpected === 0 ? available : Math.min(maxExpected, available);
+    if (maxExpected !== 0 && size > maxExpected) size = maxExpected;
+    if (size > 0) { items[i] = buf.subarray(off, off + size); offsets[i] = off; }
+  }
+  return makeFixed(items, offsets);
+}
+function fixedDataItemSize(meta, itemSize, buf) {               // FixedData(meta, itemSize, stream)
+  const n = meta.adjusted, items = new Array(n).fill(null), offsets = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const off = getInt(meta.get(i), 4);
+    if (off < 0 || off > buf.length) continue;
+    const available = buf.length - off;
+    if (itemSize < 0) itemSize = available; else if (itemSize > available) itemSize = available;
+    items[i] = buf.subarray(off, off + itemSize); offsets[i] = off;
+  }
+  return makeFixed(items, offsets);
+}
+function fixedDataBlocks(itemSize, buf) {                       // FixedData(itemSize, stream)
+  const n = Math.floor(buf.length / itemSize), items = [], offsets = [];
+  for (let i = 0; i < n; i++) { items.push(buf.subarray(i * itemSize, (i + 1) * itemSize)); offsets.push(i * itemSize); }
+  return makeFixed(items, offsets);
+}
+function varMeta(b) {
+  const table = new Map(), offsets = [];
+  const magic = getInt(b, 0);
+  if (magic !== 0 && magic !== FIXED_MAGIC) throw new ReadError('Unexpected data block in the file.');
+  const count = getInt(b, 8); let p = 24;
+  for (let i = 0; i < count; i++) {
+    if (b.length - p < 12) break;
+    const uid = getInt(b, p), off = getInt(b, p + 4), type = getShort(b, p + 8); p += 12;
+    if (!table.has(uid)) table.set(uid, new Map());
+    table.get(uid).set(type, off); offsets.push(off);
+  }
+  offsets.sort((a, c) => a - c);
+  return { table, offsets, offset: (uid, type) => (table.has(uid) && type != null ? table.get(uid).get(type) : undefined) };
+}
+function varData(meta, b) {
+  const map = new Map();
+  for (const off of meta.offsets) {
+    if (off >= b.length || map.has(off)) continue;
+    const size = getInt(b, off);
+    if (size < 0 || size > b.length - off - 4) continue;
+    map.set(off, b.subarray(off + 4, off + 4 + size));
+  }
+  const bytes = (uid, type) => { const o = meta.offset(uid, type); return o == null ? null : map.get(o) || null; };
+  return {
+    meta, bytes,
+    short: (u, t) => { const v = bytes(u, t); return v && v.length >= 2 ? getShort(v, 0) : 0; },
+    int: (u, t) => { const v = bytes(u, t); return v && v.length >= 4 ? getInt(v, 0) : 0; },
+    double: (u, t) => { const v = bytes(u, t); return v && v.length >= 8 ? getDouble(v, 0) : 0; },
+    unicode: (u, t) => { const v = bytes(u, t); return v ? unicodeString(v, 0) : null; },
+    ascii: (u, t) => { const v = bytes(u, t); return v ? asciiString(v, 0) : null; },
+    timestamp: (u, t) => { const v = bytes(u, t); return v && v.length >= 4 ? timestamp(v, 0) : null; }
+  };
+}
+
+/* ------------------------------------------------------ dates, durations */
+const EPOCH = Date.UTC(1983, 11, 31);
+function timestamp(b, o) {                                       // -> ms since 1970, as naive local time in UTC fields
+  const days = getShort(b, o + 2);
+  if (days <= 1 || days === 65535) return null;
+  let time = getShort(b, o); if (time === 65535) time = 0;
+  const secs = time * 6;
+  if (days < 100 && secs % 60 !== 0) return null;
+  return EPOCH + days * 864e5 + secs * 1000;
+}
+const iso = ms => { if (ms == null) return null; const s = new Date(ms).toISOString(); return s.slice(17, 19) === '00' ? s.slice(0, 16) : s.slice(0, 19); };
+const UNIT_CODES = { 3: 'm', 4: 'em', 5: 'h', 6: 'eh', 7: 'd', 8: 'ed', 9: 'w', 10: 'ew', 11: 'mo', 12: 'emo', 19: '%', 20: 'e%' };
+const timeUnits = (v, def) => { const k = v & 0x1F; return k === 21 ? (def || 'd') : UNIT_CODES[k] || 'd'; };
+function adjustedDuration(pp, raw, unit) {
+  if (raw === -1) return null;
+  const per = {
+    d: pp.minutesPerDay * 10, ed: 14400, w: pp.minutesPerWeek * 10, ew: 100800,
+    mo: pp.minutesPerDay * pp.daysPerMonth * 10, emo: 432000, m: 10, em: 10, h: 600, eh: 600
+  }[unit];
+  if (per === undefined) return { v: raw, u: unit };
+  return { v: per ? raw / per : 0, u: unit };
+}
+function toMinutes(d, pp) {
+  if (!d) return null;
+  const f = { m: 1, em: 1, h: 60, eh: 60, d: pp.minutesPerDay, ed: 1440, w: pp.minutesPerWeek, ew: 10080, mo: pp.minutesPerDay * pp.daysPerMonth, emo: 43200 }[d.u];
+  return f == null ? null : d.v * f;
+}
+const durStr = d => (d ? `${Number.isInteger(d.v) ? d.v.toFixed(1) : +d.v.toFixed(6)}${d.u}` : null);
+
+/* ------------------------------------------------------------ field maps */
+function parseSizes(s) { const m = new Map(); for (const p of s.split(',')) { const [a, b] = p.split(':'); m.set(+a, +b); } return m; }
+const SIZES = { task: parseSizes(TASK_SIZES), rsc: parseSizes(RSC_SIZES), assn: parseSizes(ASSN_SIZES) };
+const BASES = { task: 0x0B400000, rsc: 0x0C400000, assn: 0x0F400000 };
+const DEFS = { task: TASK_FIELDS, rsc: RSC_FIELDS, assn: ASSN_FIELDS };
+
+function fieldMap(data, kind) {
+  const items = new Map(), max = [0, 0];
+  if (!data) return { items, max, offset: () => -1, key: () => undefined };
+  let idx = 0, last = 0, block = 0;
+  while (idx + 28 <= data.length) {
+    const blockOffset = getShort(data, idx + 4), typeValue = getInt(data, idx + 12), category = getShort(data, idx + 20);
+    const sameClass = (typeValue & 0xFFFF0000) === BASES[kind] && (typeValue & 0x8000) === 0;
+    const fid = typeValue & 0xFFFF;
+    const def = sameClass ? DEFS[kind][fid] : null;
+    const size = sameClass ? SIZES[kind].get(fid) || 0 : 0;
+    let loc = null;
+    if (category !== 0x0B && category !== 0x64) {
+      if (blockOffset !== 65535) {
+        loc = 'fixed';
+        if (blockOffset < last) ++block;
+        last = blockOffset;
+        if (blockOffset + size > max[block]) max[block] = blockOffset + size;
+      } else if (fid !== 0) loc = 'var';
+    }
+    if (def && loc) items.set(def[0], { name: def[0], type: def[1], units: def[2], loc, block, offset: blockOffset, key: fid });
+    else if (def) items.delete(def[0]);
+    idx += 28;
+  }
+  return { items, max, offset: n => (items.get(n) && items.get(n).loc === 'fixed' ? items.get(n).offset : -1), key: n => (items.get(n) ? items.get(n).key : undefined) };
+}
+
+function readField(fm, item, uid, fixed, vd, pp) {
+  const unitsOf = (fallback) => {
+    if (!item.units || !fm.items.has(item.units)) return fallback;
+    return readField(fm, fm.items.get(item.units), uid, fixed, vd, pp) || fallback;
+  };
+  if (item.loc === 'fixed') {
+    const b = fixed[item.block], o = item.offset;
+    if (!b || o >= b.length) return null;
+    switch (item.type) {
+      case 'DATE': return timestamp(b, o);
+      case 'INTEGER': return getInt(b, o);
+      case 'SHORT': return getShort(b, o);
+      case 'DURATION': return adjustedDuration(pp, getInt(b, o), unitsOf(pp.durationUnits));
+      case 'TIME_UNITS': return timeUnits(getShort(b, o), pp.durationUnits);
+      case 'CONSTRAINT': return getShort(b, o);
+      case 'PERCENTAGE': { const v = getShort(b, o); return v >= 0 && v <= 100 ? v : null; }
+      case 'CURRENCY': { const a = getDouble(b, o); return (Math.abs(a) < 0.1 ? 0 : a) / 100; }
+      case 'WORK': { const a = getDouble(b, o); return (Math.abs(a) < 1000 ? 0 : a) / 60000; }
+      case 'BOOLEAN': return getShort(b, o) !== 0;
+      default: return null;
+    }
+  }
+  if (item.loc === 'var') {
+    const k = item.key;
+    const listFlag = () => { const f = vd.short(uid, k); return f === 0x0701 || f === 0x0401; };
+    switch (item.type) {
+      case 'STRING': return listFlag() ? null : vd.unicode(uid, k);
+      case 'DATE': return listFlag() ? null : vd.timestamp(uid, k);
+      case 'NOTES': { const s = vd.ascii(uid, k); return s == null ? null : rtfToText(s); }
+      case 'INTEGER': return vd.int(uid, k);
+      case 'SHORT': case 'PERCENTAGE': return vd.short(uid, k);
+      case 'BOOLEAN': return vd.short(uid, k) !== 0;
+      case 'TIME_UNITS': return timeUnits(vd.short(uid, k), pp.durationUnits);
+      case 'CURRENCY': { const a = vd.double(uid, k); return (Math.abs(a) < 0.1 ? 0 : a) / 100; }
+      case 'WORK': { const a = vd.double(uid, k); return (Math.abs(a) < 1000 ? 0 : a) / 60000; }
+      case 'DURATION': {
+        const b = vd.bytes(uid, k);
+        if (!b) return null;
+        if (b.length === 512) return null;              // free-text duration
+        return b.length >= 4 ? adjustedDuration(pp, getInt(b, 0), unitsOf('h')) : null;
+      }
+      default: return null;
+    }
+  }
+  return null;
+}
+function populate(fm, uid, fixed, vd, pp) {
+  const o = {};
+  for (const item of fm.items.values()) o[item.name] = readField(fm, item, uid, fixed, vd, pp);
+  return o;
+}
+
+/* --------------------------------------------------------------- RTF text */
+function rtfToText(rtf) {
+  if (!rtf || !rtf.startsWith('{\\rtf')) return (rtf || '').trim() || null;
+  const skipDest = new Set(['fonttbl', 'colortbl', 'stylesheet', 'info', 'pict', 'object', 'header', 'footer', 'xmlnstbl', 'listtable', 'listoverridetable', 'rsidtbl', 'generator', 'themedata', 'colorschememapping', 'latentstyles', 'datastore', 'mmathPr', 'fldinst']);
+  const cp = new TextDecoder('windows-1252');
+  let out = '', i = 0, depth = 0, ucSkip = 1, pendingSkip = 0;
+  const stack = []; let skipping = false;
+  while (i < rtf.length) {
+    const c = rtf[i];
+    if (c === '{') { stack.push(skipping); depth++; i++; continue; }
+    if (c === '}') { skipping = stack.pop() || false; depth--; i++; continue; }
+    if (c === '\\') {
+      const m = /^\\([a-zA-Z]+)(-?\d+)? ?|^\\'([0-9a-fA-F]{2})|^\\([^a-zA-Z])/.exec(rtf.slice(i, i + 40));
+      if (!m) { i++; continue; }
+      i += m[0].length;
+      if (m[3]) { if (pendingSkip) { pendingSkip--; continue; } if (!skipping) out += cp.decode(new Uint8Array([parseInt(m[3], 16)])); continue; }
+      if (m[4]) { if (m[4] === '*') skipping = true; else if (!skipping && '\\{}'.includes(m[4])) out += m[4]; else if (!skipping && m[4] === '~') out += ' '; continue; }
+      const word = m[1], arg = m[2];
+      if (skipDest.has(word)) { skipping = true; continue; }
+      if (skipping) continue;
+      if (word === 'par' || word === 'line' || word === 'sect' || word === 'row') out += '\n';
+      else if (word === 'tab' || word === 'cell') out += '\t';
+      else if (word === 'uc') ucSkip = +arg;
+      else if (word === 'u') { let n = +arg; if (n < 0) n += 65536; out += String.fromCharCode(n); pendingSkip = ucSkip; }
+      else if (word === 'emdash') out += '—'; else if (word === 'endash') out += '–';
+      else if (word === 'bullet') out += '•'; else if (word === 'lquote') out += '‘'; else if (word === 'rquote') out += '’';
+      else if (word === 'ldblquote') out += '“'; else if (word === 'rdblquote') out += '”';
+      continue;
+    }
+    if (c === '\r' || c === '\n') { i++; continue; }
+    if (pendingSkip) { pendingSkip--; i++; continue; }
+    if (!skipping) out += c;
+    i++;
+  }
+  out = out.replace(/[ \t]+\n/g, '\n').trim();
+  return out || null;
+}
+
+/* ------------------------------------------------- OLE property sets */
+function propertySet(b) {
+  const out = {};
+  if (!b || b.length < 48) return out;
+  const dv = new DataView(b.buffer, b.byteOffset, b.length);
+  const sec = dv.getUint32(44, true);
+  if (sec + 8 > b.length) return out;
+  const count = dv.getUint32(sec + 4, true);
+  let codepage = 1252;
+  const props = [];
+  for (let i = 0; i < count && sec + 8 + i * 8 + 8 <= b.length; i++) props.push([dv.getUint32(sec + 8 + i * 8, true), dv.getUint32(sec + 12 + i * 8, true)]);
+  const cpProp = props.find(p => p[0] === 1); if (cpProp && sec + cpProp[1] + 6 <= b.length) codepage = dv.getUint16(sec + cpProp[1] + 4, true);
+  let dec; try { dec = new TextDecoder(codepage === 65001 ? 'utf-8' : codepage === 1200 ? 'utf-16le' : 'windows-' + codepage); } catch { dec = new TextDecoder('windows-1252'); }
+  for (const [id, off] of props) {
+    const p = sec + off; if (p + 8 > b.length) continue;
+    const type = dv.getUint32(p, true);
+    try {
+      if (type === 0x1E) { const n = dv.getUint32(p + 4, true); out[id] = dec.decode(b.subarray(p + 8, p + 8 + n)).replace(/\0+$/, ''); }
+      else if (type === 0x1F) { const n = dv.getUint32(p + 4, true); out[id] = new TextDecoder('utf-16le').decode(b.subarray(p + 8, p + 8 + n * 2)).replace(/\0+$/, ''); }
+      else if (type === 0x40) { const lo = dv.getUint32(p + 4, true), hi = dv.getUint32(p + 8, true); const t = (hi * 4294967296 + lo) / 1e4 - 11644473600000; if (t > 0) out[id] = new Date(t); }
+    } catch { /* ignore a malformed property */ }
+  }
+  return out;
+}
+const localIso = d => (d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : null);
+
+/* ------------------------------------------------------------ MPP14 read */
+const TASK_BIT_FLAGS = {
+  2010: { meta: [['MILESTONE', 8, 0x20]], meta2: [['ACTIVE', 8, 0x04], ['TASK_MODE', 8, 0x08]] },
+  2013: { meta: [['MILESTONE', 10, 0x02]], meta2: [['ACTIVE', 8, 0x40], ['TASK_MODE', 8, 0x80]] },
+  2016: { meta: [['MILESTONE', 10, 0x02]], meta2: [['ACTIVE', 8, 0x40], ['TASK_MODE', 8, 0x80]] }
+};
+const RELATION_TYPES = ['FF', 'FS', 'SF', 'SS'];
+
+function readMPP(root, fileName) {
+  const compObj = root.get('\u0001CompObj');
+  let appName = '', format = '';
+  if (compObj) {
+    const c = compObj.data();
+    const len1 = getInt(c, 28); appName = new TextDecoder('windows-1252').decode(c.subarray(32, 32 + Math.max(0, len1 - 1)));
+    const p2 = 32 + len1, len2 = getInt(c, p2);
+    if (len2 > 0) format = new TextDecoder('windows-1252').decode(c.subarray(p2 + 4, p2 + 4 + len2 - 1));
+  }
+  const vm = /Microsoft.Project.(\d+)\.0/.exec(appName);
+  const appVersion = vm ? +vm[1] : 0;
+  if (!/^MSProject\.(MPP|MPT|GLOBAL)14$/.test(format)) {
+    if (/^MSProject\.(MPP|MPT|GLOBAL)(8|9|12)$/.test(format) || appName === 'Microsoft Project 4.0')
+      throw new ReadError('This file was saved in an older Project format (Project 2007 or earlier). Open it in Project and use Save As, choosing "Project" (.mpp) or "XML", then upload that file.');
+    throw new ReadError("This doesn't look like a Microsoft Project file.");
+  }
+
+  const rootProps = props14(root.get('Props14') && root.get('Props14').data());
+  const pwFlag = rootProps.get(P.PASSWORD_FLAG) ? rootProps.get(P.PASSWORD_FLAG)[0] : 0;
+  if ((pwFlag & 1) && rootProps.get(P.PROTECTION_PASSWORD_HASH))
+    throw new ReadError('This file is password-protected. Remove the password in Project (File > Info > Protect), save, and upload it again.');
+  const encCode = rootProps.get(P.ENCRYPTION_CODE) ? rootProps.get(P.ENCRYPTION_CODE)[0] : 0;
+  const mask = pwFlag !== 0 ? (encCode === 0 ? 0 : (0xFF - encCode) & 0xFF) : 0;
+  const decoded = n => { const d = n.data(); if (!mask) return d; const o = new Uint8Array(d.length); for (let i = 0; i < d.length; i++) o[i] = d[i] ^ mask; return o; };
+
+  const projDir = root.get('   114');
+  if (!projDir) throw new ReadError("The file's project data couldn't be found.");
+  const need = (dir, name) => { const n = dir && dir.get(name); if (!n) throw new ReadError(`The file is missing its ${name} data.`); return n; };
+  const props = props14(decoded(need(projDir, 'Props')));
+
+  let durationUnits = timeUnits(pShort(props, P.DURATION_UNITS)); if (durationUnits === 'd' && (pShort(props, P.DURATION_UNITS) & 0x1F) === 21) durationUnits = 'd';
+  const pp = {
+    durationUnits,
+    minutesPerDay: pInt(props, P.MINUTES_PER_DAY) || 480,
+    minutesPerWeek: pInt(props, P.MINUTES_PER_WEEK) || 2400,
+    daysPerMonth: pShort(props, P.DAYS_PER_MONTH) || 20,
+    criticalSlackLimit: pInt(props, P.CRITICAL_SLACK_LIMIT)
+  };
+  const pDate = k => (props.get(k) ? timestamp(props.get(k), 0) : null);
+  const pStr = k => (props.get(k) ? unicodeString(props.get(k), 0) : null);
+  const getFM = (kind, ...keys) => fieldMap(keys.map(k => props.get(k)).find(Boolean), kind);
+
+  /* ---- tasks */
+  const fm = getFM('task', P.TASK_FIELD_MAP, P.TASK_FIELD_MAP2);
+  const taskDir = need(projDir, 'TBkndTask');
+  const tVarMeta = varMeta(need(taskDir, 'VarMeta').data());
+  const tVar = varData(tVarMeta, need(taskDir, 'Var2Data').data());
+  const tFixedMeta = fixedMeta(need(taskDir, 'FixedMeta').data(), 47);
+  const tFixed = fixedData(tFixedMeta, need(taskDir, 'FixedData').data(), fm.max[0]);
+  const tFixed2Meta = fixedMetaMatching(need(taskDir, 'Fixed2Meta').data(), tFixed, [92, 93, 94, 95, 96]);
+  const tFixed2 = fixedData(tFixed2Meta, need(taskDir, 'Fixed2Data').data());
+
+  // createTaskMap
+  const taskMap = new Map();
+  const uidOff = fm.offset('UNIQUE_ID');
+  for (let loop = tFixedMeta.adjusted - 1; loop > 2; loop--) {
+    const data = tFixed.get(loop), data2 = tFixed2.get(loop);
+    if (!data || !data2) continue;
+    const flags = getInt(tFixedMeta.get(loop), 0);
+    if (flags & 0x02) { const u = getShort(data, 0); if (!taskMap.has(u)) taskMap.set(u, null); continue; }
+    if (data.length === 16) { const u = getInt(data, 0); if (!taskMap.has(u)) taskMap.set(u, loop); continue; }
+    const maxSize = fm.max[0];
+    if (maxSize === 0 || Math.trunc(data.length * 100 / maxSize) > 75) {
+      const u = getInt(data, uidOff);
+      if (!taskMap.has(u) || (tVarMeta.table.get(u) && tVarMeta.table.get(u).size)) {
+        if (!taskMap.has(u) || (flags & 0x04) === 0) taskMap.set(u, loop);
+      }
+    }
+  }
+
+  const ver = appVersion <= 14 ? 2010 : appVersion === 15 ? 2013 : 2016;
+  const flags = TASK_BIT_FLAGS[ver];
+  const tasks = new Map();            // uid -> task (insertion order)
+  const byId = new Map();
+  const taskOrder = [], nullOrder = new Map();
+  let autoWBS = true;
+  const addNull = (data) => {
+    const id = getInt(data, 4);
+    if (nullOrder.has(id)) return;
+    const t = { uid: getInt(data, 0), id, isNull: true };
+    tasks.set(t.uid, t); byId.set(id, t); nullOrder.set(id, t.uid);
+  };
+  const idOff = fm.offset('ID');
+
+  for (const uid of [...taskMap.keys()].sort((a, c) => a - c)) {
+    const index = taskMap.get(uid);
+    if (!tFixed.valid(index)) continue;
+    let data = tFixed.get(index);
+    if (!data) continue;
+    const meta = tFixedMeta.get(index);
+    const id = getInt(data, idOff);
+    if (data.length === 16) { addNull(data); continue; }
+    if (data.length < fm.max[0]) data = pad(data, fm.max[0] + 8);
+    const meta2 = tFixed2Meta.get(index), data2 = tFixed2.get(index);
+    const existing = byId.get(id);
+    if (existing) {
+      if (!tVarMeta.table.has(uid)) continue;
+      if (existing.NAME == null) { tasks.delete(existing.uid); byId.delete(id); if (existing.isNull) nullOrder.delete(id); }
+    }
+    const t = populate(fm, uid, [data, data2], tVar, pp);
+    for (const [name, off, m] of flags.meta) t[name] = !!(meta && (getInt(meta, off) & m));
+    for (const [name, off, m] of flags.meta2) if (meta2) t[name] = !!(getInt(meta2, off) & m);
+    t.uid = uid; t.id = id;
+    t.manual = !!t.TASK_MODE;
+    if (t.START == null || (t.SCHEDULED_START != null && !t.manual)) t.START = t.SCHEDULED_START;
+    if (t.FINISH == null || (t.SCHEDULED_FINISH != null && !t.manual)) t.FINISH = t.SCHEDULED_FINISH;
+    t.DURATION = t.SCHEDULED_DURATION;
+    if (t.CONSTRAINT_TYPE === 1) {                                   // as late as possible
+      if (t.LATE_START != null && (t.START == null || t.START < t.LATE_START)) t.START = t.LATE_START;
+      if (t.LATE_FINISH != null && (t.FINISH == null || t.FINISH < t.LATE_FINISH)) t.FINISH = t.LATE_FINISH;
+    } else if (t.CONSTRAINT_TYPE === 5 || t.CONSTRAINT_TYPE === 7) {
+      if (t.FINISH != null && t.START != null && t.FINISH < t.START) t.FINISH = t.LATE_FINISH;
+    }
+    if (t.WBS != null) autoWBS = false;
+    if (t.manual) t.DURATION = t.MANUAL_DURATION; else t.MANUAL_DURATION = null;
+    if (t.NAME == null && (t.START == null || t.FINISH == null || t.CREATED == null)) { addNull(data); continue; }
+    tasks.set(uid, t); byId.set(id, t);
+    if (!data2 || data2.length < 24) nullOrder.set(id, uid);
+    else taskOrder.push([getLong(data2, 16), uid]);
+    if (!t.manual || t.ACTUAL_START != null) t.START_TEXT = t.FINISH_TEXT = t.DURATION_TEXT = null;
+    t.external = !!t.SUBPROJECT_TASK_ID;
+    if (t.BASELINE_START == null) t.BASELINE_START = t.BASELINE_ESTIMATED_START;
+    if (t.BASELINE_FINISH == null) t.BASELINE_FINISH = t.BASELINE_ESTIMATED_FINISH;
+  }
+
+  // postProcessTasks: rebuild ID order
+  taskOrder.sort((a, c) => (a[0] < c[0] ? -1 : a[0] > c[0] ? 1 : 0));
+  const inc = (Math.floor(nullOrder.size / 1000) + 1) * 2000;
+  const order = new Map();
+  let nextID = tasks.has(0) ? 0 : inc;
+  for (const [, u] of taskOrder) { order.set(nextID, u); nextID += inc; }
+  let insertions = 0; const offsetMap = new Map();
+  for (const id of [...nullOrder.keys()].sort((a, c) => a - c)) {
+    const base = (id - insertions) * inc; let target = base;
+    const prev = offsetMap.get(base); let offset = prev == null ? 0 : prev + 1;
+    ++insertions;
+    while (order.has(target)) { ++offset; if (offset === inc) throw new ReadError("The task order in this file couldn't be worked out."); target = base - (inc - offset); }
+    offsetMap.set(base, offset); order.set(target, nullOrder.get(id));
+  }
+  nextID = tasks.has(0) ? 0 : 1;
+  for (const key of [...order.keys()].sort((a, c) => a - c)) { const t = tasks.get(order.get(key)); if (t) t.id = nextID; nextID++; }
+
+  /* ---- relations */
+  const consDir = projDir.get('TBkndCons');
+  if (consDir) {
+    const cMeta = fixedMeta(need(consDir, 'FixedMeta').data(), 10);
+    const cData = fixedDataItemSize(cMeta, 20, decoded(need(consDir, 'FixedData')));
+    const p15 = appVersion > 14, unitsOff = p15 ? 18 : 14, durOff = p15 ? 14 : 16;
+    for (let i = 0; i < cMeta.itemCount; i++) {
+      const m = cMeta.get(i); if (!m || getShort(m, 0) !== 0) continue;
+      const idx = cData.indexOf(getInt(m, 4)); if (idx === -1) continue;
+      const d = cData.get(idx); if (!d || d.length < 14) continue;
+      const a = getInt(d, 4), b = getInt(d, 8);
+      if (!a || !b || a === b) continue;
+      const t1 = tasks.get(a), t2 = tasks.get(b);
+      if (!t1 || !t2 || t1.isNull || t2.isNull) continue;
+      const typeVal = getShort(d, 12);
+      const lag = adjustedDuration(pp, getInt(d, durOff), timeUnits(getShort(d, unitsOff)));
+      (t2.preds = t2.preds || []).push({ uid: a, type: RELATION_TYPES[typeVal] || 'FS', lag });
+    }
+  }
+
+  /* ---- resources and assignments */
+  const resources = new Map();
+  try {
+    const rfm = getFM('rsc', P.RESOURCE_FIELD_MAP, P.RESOURCE_FIELD_MAP2);
+    const rDir = projDir.get('TBkndRsc');
+    if (rDir) {
+      const rVarMeta = varMeta(need(rDir, 'VarMeta').data());
+      const rVar = varData(rVarMeta, need(rDir, 'Var2Data').data());
+      const rMeta = fixedMeta(need(rDir, 'FixedMeta').data(), 37);
+      const rData = fixedData(rMeta, decoded(need(rDir, 'FixedData')));
+      const rUidOff = rfm.offset('UNIQUE_ID'), nameKey = rfm.key('NAME');
+      const rMap = new Map();
+      for (let i = 0; i < rMeta.adjusted; i++) {
+        const d = rData.get(i); if (!d || d.length < rfm.max[0]) continue;
+        const u = getShort(d, rUidOff); if (!rMap.has(u)) rMap.set(u, i);
+      }
+      for (const u of [...rVarMeta.table.keys()].sort((a, c) => a - c)) {
+        if (!rMap.has(u)) continue;
+        const name = rVar.unicode(u, nameKey);
+        resources.set(u, { uid: u, name: name || null });
+      }
+    }
+    const afm = getFM('assn', P.ASSIGNMENT_FIELD_MAP, P.ASSIGNMENT_FIELD_MAP2);
+    const aDir = projDir.get('TBkndAssn');
+    if (aDir) {
+      const aVarMeta = varMeta(need(aDir, 'VarMeta').data());
+      const aMeta = fixedMeta(need(aDir, 'FixedMeta').data(), 34);
+      const aData = fixedDataBlocks(110, decoded(need(aDir, 'FixedData')));
+      const oU = afm.offset('UNIQUE_ID'), oT = afm.offset('TASK_UNIQUE_ID'), oR = afm.offset('RESOURCE_UNIQUE_ID');
+      for (let i = 0; i < aMeta.itemCount; i++) {
+        const m = aMeta.get(i); if (!m || m[0] !== 0) continue;
+        let d = aData.get(aData.indexOf(getInt(m, 4))); if (!d) continue;
+        if (d.length < afm.max[0]) d = pad(d, afm.max[0]);
+        if (!aVarMeta.table.has(getInt(d, oU))) continue;
+        const t = tasks.get(getInt(d, oT)); if (!t || t.isNull) continue;
+        const r = resources.get(getInt(d, oR));
+        t.res = t.res || new Set();
+        if (r && r.name) t.res.add(r.name);
+      }
+    }
+  } catch (e) { if (!(e instanceof ReadError)) console.warn('Resources could not be read', e); }
+
+  /* ---- project properties */
+  const si = propertySet(root.get('\u0005SummaryInformation') && root.get('\u0005SummaryInformation').data());
+  const dsi = propertySet(root.get('\u0005DocumentSummaryInformation') && root.get('\u0005DocumentSummaryInformation').data());
+  const project = {
+    title: si[2] || pStr(P.TITLE), author: si[4] || pStr(P.AUTHOR),
+    manager: dsi[14] || pStr(P.MANAGER), company: dsi[15] || pStr(P.COMPANY),
+    start: iso(pDate(P.PROJECT_START_DATE)), finish: iso(pDate(P.PROJECT_FINISH_DATE)), statusDate: iso(pDate(P.STATUS_DATE)),
+    lastSaved: localIso(si[13]), application: appName || null, fileType: 'MPP', fileName
+  };
+
+  return finish(project, [...tasks.values()], [...resources.values()], pp, autoWBS);
+}
+
+/* ------------------------------------------ structure, slack, output */
+function finish(project, list, resources, pp, autoWBS) {
+  list.sort((a, c) => a.id - c.id);
+  const structured = list.length > 1;
+  const rootKids = [];
+  let last = null, lastLevel = -1;
+  const kids = new Map();
+  for (const t of list) {
+    let parent = null;
+    if (!t.isNull && structured) {
+      let level = t.OUTLINE_LEVEL || 0;
+      if (last) {
+        if (level === lastLevel) { parent = last.parentTask; level = lastLevel; }
+        else if (level > lastLevel) parent = last;
+        else {
+          while (level <= lastLevel) {
+            parent = last.parentTask;
+            if (!parent) break;
+            lastLevel = parent.OUTLINE_LEVEL || 0; last = parent;
+          }
+        }
+      }
+      last = t; lastLevel = level;
+      const siblings = parent ? (kids.get(parent.uid) || []) : rootKids;
+      const childCount = siblings.length + 1;
+      const gen = (pv) => (parent == null ? (t.uid === 0 ? '0' : String(rootKids.length + 1)) : (pv === '0' ? String(childCount) : pv + '.' + childCount));
+      if (autoWBS || t.WBS == null) t.WBS = gen(parent && parent.WBS);
+      let pon = parent && parent.outline; if (pon) { const k = pon.lastIndexOf('.0'); if (k !== -1) pon = pon.slice(0, k); }
+      t.outline = gen(pon);
+    }
+    t.parentTask = parent;
+    if (parent) { if (!kids.has(parent.uid)) kids.set(parent.uid, []); kids.get(parent.uid).push(t); }
+    else rootKids.push(t);
+  }
+  for (const t of list) {
+    t.summary = kids.has(t.uid) || (!!t.SUBPROJECT_FILE && !t.external);
+    // drop links from a task to its own summary (as Project does)
+    if (t.preds) t.preds = t.preds.filter(p => { const pt = list.find(x => x.uid === p.uid); return !(t.outline && pt && pt.outline && t.outline.startsWith(pt.outline + '.')); });
+  }
+
+  const out = list.map(t => {
+    if (t.isNull) return { uid: t.uid, id: t.id, parent: null, wbs: null, outline: null, level: 0, name: null, blank: true, summary: false, milestone: false, critical: false, manual: false, active: true, start: null, finish: null, duration: null, durationDays: null, pct: 0, actualStart: null, actualFinish: null, baselineStart: null, baselineFinish: null, totalSlack: null, work: null, cost: null, notes: null, resources: [], preds: [] };
+    const dur = t.DURATION;
+    const durMin = toMinutes(dur, pp);
+    // total slack = min(start slack, finish slack), or finish slack once started
+    let slack = null;
+    if (t.START_SLACK && t.FINISH_SLACK && dur) {
+      slack = t.ACTUAL_START != null ? t.FINISH_SLACK : (toMinutes(t.START_SLACK, pp) < toMinutes(t.FINISH_SLACK, pp) ? t.START_SLACK : t.FINISH_SLACK);
+    } else if (t.FINISH_SLACK && t.ACTUAL_START != null) slack = t.FINISH_SLACK;
+    let slackMin = slack ? toMinutes(slack, pp) : null;
+    if (slack && dur && slack.u !== dur.u) { const f = toMinutes({ v: 1, u: dur.u }, pp); if (f) slack = { v: slackMin / f, u: dur.u }; }
+    const pct = t.PERCENT_COMPLETE || 0;
+    const critical = t.ACTUAL_FINISH == null && slackMin != null && slackMin / pp.minutesPerDay <= pp.criticalSlackLimit && pct !== 100 && (!t.manual || (t.DURATION_TEXT == null && t.START_TEXT == null && t.FINISH_TEXT == null));
+    return {
+      uid: t.uid, id: t.id, parent: t.parentTask && !t.parentTask.isNull ? t.parentTask.uid : null,
+      wbs: t.WBS || null, outline: t.outline || null, level: t.OUTLINE_LEVEL || 0,
+      name: t.NAME || null, blank: false, summary: t.summary, milestone: !!t.MILESTONE, critical,
+      manual: t.manual, active: t.ACTIVE !== false, external: !!t.external,
+      start: iso(t.START), finish: iso(t.FINISH),
+      duration: durStr(dur), durationDays: durMin == null ? null : durMin / pp.minutesPerDay,
+      pct, actualStart: iso(t.ACTUAL_START), actualFinish: iso(t.ACTUAL_FINISH),
+      baselineStart: iso(t.BASELINE_START), baselineFinish: iso(t.BASELINE_FINISH),
+      totalSlack: durStr(slack), work: t.WORK != null ? `${t.WORK}h` : null, cost: t.COST,
+      notes: t.NOTES || null, resources: t.res ? [...t.res].sort() : [],
+      preds: (t.preds || []).map(p => ({ uid: p.uid, type: p.type, lag: p.lag && p.lag.v ? durStr(p.lag) : null }))
+    };
+  });
+  return { project, tasks: out, resources: resources.filter(r => r.name).map(r => ({ uid: r.uid, name: r.name })) };
+}
+
+/* ---------------------------------------------------- Project XML read */
+function readXML(text, fileName) {
+  if (typeof DOMParser === 'undefined') throw new ReadError('XML files can only be read in a browser.');
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new ReadError("The XML file couldn't be read. It may be damaged.");
+  const root = doc.documentElement;
+  if (!root || root.localName !== 'Project') throw new ReadError("This XML file isn't a Microsoft Project XML file.");
+  const kid = (el, name) => { if (!el) return null; for (const c of el.children) if (c.localName === name) return c; return null; };
+  const kids = (el, name) => (el ? [...el.children].filter(c => c.localName === name) : []);
+  const txt = (el, name) => { const c = kid(el, name); return c ? c.textContent.trim() : null; };
+  const num = (el, name) => { const v = txt(el, name); return v == null || v === '' ? null : +v; };
+  const date = (el, name) => { const v = txt(el, name); return v ? v.slice(0, 16) : null; };
+  const mpd = num(root, 'MinutesPerDay') || 480;
+  const pDur = s => { // PT8H30M0S
+    if (!s) return null;
+    const m = /^-?P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(s);
+    if (!m) return null;
+    const mins = (+(m[3] || 0)) * 1440 + (+(m[4] || 0)) * 60 + (+(m[5] || 0)) + (+(m[6] || 0)) / 60;
+    return (s.startsWith('-') ? -1 : 1) * mins;
+  };
+  const days = mins => (mins == null ? null : mins / mpd);
+  const ds = d => (d == null ? null : `${Number.isInteger(+d.toFixed(6)) ? d.toFixed(1) : +d.toFixed(6)}d`);
+
+  const resources = new Map();
+  for (const r of kids(kid(root, 'Resources'), 'Resource')) { const n = txt(r, 'Name'); if (n) resources.set(num(r, 'UID'), n); }
+  const resByTask = new Map();
+  for (const a of kids(kid(root, 'Assignments'), 'Assignment')) {
+    const n = resources.get(num(a, 'ResourceUID')); if (!n) continue;
+    const u = num(a, 'TaskUID'); if (!resByTask.has(u)) resByTask.set(u, new Set()); resByTask.get(u).add(n);
+  }
+  const TYPES = { 0: 'FF', 1: 'FS', 2: 'SF', 3: 'SS' };
+  const fmtLagUnits = { 3: 'm', 4: 'em', 5: 'h', 6: 'eh', 7: 'd', 8: 'ed', 9: 'w', 10: 'ew', 11: 'mo', 12: 'emo', 19: '%', 20: 'e%' };
+  const list = [];
+  for (const t of kids(kid(root, 'Tasks'), 'Task')) {
+    if (txt(t, 'IsNull') === '1') { list.push({ uid: num(t, 'UID'), id: num(t, 'ID'), parent: null, blank: true, level: 0, resources: [], preds: [], pct: 0, summary: false, milestone: false, critical: false, manual: false, active: true }); continue; }
+    const base0 = kids(t, 'Baseline').find(b => txt(b, 'Number') === '0');
+    const durMin = pDur(txt(t, 'Duration'));
+    const slackTenths = num(t, 'TotalSlack');
+    const preds = kids(t, 'PredecessorLink').map(l => {
+      const lag = num(l, 'LinkLag') || 0, fmt = num(l, 'LagFormat');
+      const unit = fmtLagUnits[fmt] || 'd';
+      let lagStr = null;
+      if (lag) lagStr = unit === '%' || unit === 'e%' ? `${lag}%` : ds(lag / 10 / mpd);
+      return { uid: num(l, 'PredecessorUID'), type: TYPES[num(l, 'Type')] || 'FS', lag: lagStr };
+    });
+    list.push({
+      uid: num(t, 'UID'), id: num(t, 'ID'), wbs: txt(t, 'WBS'), outline: txt(t, 'OutlineNumber'), level: num(t, 'OutlineLevel') || 0,
+      name: txt(t, 'Name'), blank: false, summary: txt(t, 'Summary') === '1', milestone: txt(t, 'Milestone') === '1',
+      critical: txt(t, 'Critical') === '1', manual: txt(t, 'Manual') === '1', active: txt(t, 'Active') !== '0',
+      start: date(t, 'Start'), finish: date(t, 'Finish'), duration: ds(days(durMin)), durationDays: days(durMin),
+      pct: num(t, 'PercentComplete') || 0, actualStart: date(t, 'ActualStart'), actualFinish: date(t, 'ActualFinish'),
+      baselineStart: date(base0, 'Start'), baselineFinish: date(base0, 'Finish'),
+      totalSlack: slackTenths == null ? null : ds(slackTenths / 10 / mpd), work: null, cost: num(t, 'Cost'),
+      notes: txt(t, 'Notes'), resources: [...(resByTask.get(num(t, 'UID')) || [])].sort(), preds
+    });
+  }
+  list.sort((a, c) => a.id - c.id);
+  // parents from outline level
+  const stack = [];
+  for (const t of list) {
+    if (t.blank) { t.parent = null; continue; }
+    while (stack.length && stack[stack.length - 1].level >= t.level) stack.pop();
+    t.parent = stack.length ? stack[stack.length - 1].uid : null;
+    stack.push(t);
+  }
+  const project = {
+    title: txt(root, 'Title') || txt(root, 'Name'), author: txt(root, 'Author'), manager: txt(root, 'Manager'), company: txt(root, 'Company'),
+    start: date(root, 'StartDate'), finish: date(root, 'FinishDate'), statusDate: date(root, 'StatusDate'), lastSaved: date(root, 'LastSaved'),
+    application: 'Microsoft Project XML', fileType: 'MSPDI', fileName
+  };
+  return { project, tasks: list, resources: [...resources].map(([uid, name]) => ({ uid, name })) };
+}
+
+/* ---------------------------------------------------------------- entry */
+function readBuffer(buffer, fileName = '') {
+  const b = new Uint8Array(buffer);
+  const root = readCFB(buffer);
+  if (root) return readMPP(root, fileName);
+  let start = 0; if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) start = 3;
+  const head = new TextDecoder().decode(b.subarray(start, start + 400)).trimStart();
+  if (head.startsWith('<')) return readXML(new TextDecoder().decode(b.subarray(start)), fileName);
+  if (b[0] === 0x50 && b[1] === 0x4B) throw new ReadError("This is a ZIP-based file, not a Microsoft Project file.");
+  throw new ReadError("This doesn't look like a Microsoft Project file. Upload an .mpp file, or an .xml file saved from Project.");
+}
+async function read(file) {
+  const buf = await file.arrayBuffer();
+  try { return readBuffer(buf, file.name || ''); }
+  catch (e) {
+    if (e instanceof ReadError) throw e;
+    console.error(e);
+    throw new ReadError("The file couldn't be read. It may be damaged, or saved in a format this viewer doesn't support.");
+  }
+}
+
+global.MPPReader = { read, readBuffer, ReadError };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const DAY = 864e5;
+const ZOOM = { day: 30, week: 13, month: 4.2 };
+const state = { data:null, byUid:new Map(), kids:new Map(), succ:new Map(), collapsed:new Set(), zoom:'week', q:'', filter:'all', links:true, sel:null, t0:0, t1:0 };
+
+/* ---------- dates ---------- */
+const parse = s => { if(!s) return null; const [d,t='00:00'] = s.split('T'); const [y,m,dd]=d.split('-').map(Number); const [h,mi]=t.split(':').map(Number); return new Date(y,m-1,dd,h,mi); };
+const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmt = d => d ? `${WD[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}` : '';
+const fmtLong = d => d ? `${WD[d.getDay()]} ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '—';
+const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dur = t => { if(t.durationDays!=null){ const d=Math.round(t.durationDays*10)/10; return d===1?'1 day':`${d} days`; } return t.duration||''; };
+const today = () => new Date();
+
+/* ---------- loading ---------- */
+const drop = $('#drop'), fileIn = $('#file');
+$('#pick').onclick = () => fileIn.click();
+$('#another').onclick = () => fileIn.click();
+fileIn.onchange = () => fileIn.files[0] && upload(fileIn.files[0]);
+let dragDepth = 0;
+addEventListener('dragenter', e => { if(e.dataTransfer?.types?.includes('Files')){ dragDepth++; document.body.classList.add('dragging'); }});
+addEventListener('dragleave', () => { if(--dragDepth<=0){ dragDepth=0; document.body.classList.remove('dragging'); }});
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragDepth=0; document.body.classList.remove('dragging'); const f=e.dataTransfer.files[0]; if(f) upload(f); });
+
+async function upload(file){
+  document.body.classList.remove('loaded');
+  $('#err').textContent=''; $('#busyName').textContent=file.name; drop.classList.add('loading');
+  closeDrawer();
+  try{
+    if(file.size > 200*1024*1024) throw new Error('That file is larger than 200 MB.');
+    await new Promise(r=>setTimeout(r,30));          // let the "Reading…" state paint
+    const j = await MPPReader.read(file);
+    if(!j.tasks.some(t=>!t.blank && t.start)) throw new Error('This file has no scheduled tasks to show.');
+    load(j);
+  }catch(e){
+    $('#err').textContent = e.message;
+  }finally{ drop.classList.remove('loading'); fileIn.value=''; }
+}
+
+function load(data){
+  state.data = data; state.byUid.clear(); state.kids.clear(); state.succ.clear(); state.collapsed.clear(); state.sel=null;
+  const tasks = data.tasks;
+  for(const t of tasks){
+    t.s = parse(t.start); t.f = parse(t.finish); t.bs=parse(t.baselineStart); t.bf=parse(t.baselineFinish);
+    state.byUid.set(t.uid, t);
+  }
+  for(const t of tasks){
+    if(t.parent!=null){ if(!state.kids.has(t.parent)) state.kids.set(t.parent,[]); state.kids.get(t.parent).push(t.uid); }
+    for(const p of t.preds){ if(!state.succ.has(p.uid)) state.succ.set(p.uid,[]); state.succ.get(p.uid).push({uid:t.uid,type:p.type,lag:p.lag}); }
+  }
+  const spanOf = u => { const t=state.byUid.get(u); if(t.spanDone) return t.span; t.spanDone=true;
+    let a=t.s, b=t.f; for(const k of state.kids.get(u)||[]){ const r=spanOf(k); if(r){ if(!a||r[0]<a) a=r[0]; if(!b||r[1]>b) b=r[1]; } }
+    t.span = a&&b ? [a,b] : null; return t.span; };
+  for(const t of tasks){ if(!t.blank) spanOf(t.uid); }
+  // Hide the auto "project summary" row (ID 0) if Project wrote one; show its children at top level
+  const root = tasks.find(t => t.id===0 && t.summary);
+  state.rootUid = root ? root.uid : null;
+
+  const dated = tasks.filter(t=>t.s&&t.f&&!t.blank);
+  const min = Math.min(...dated.map(t=>t.s)), max = Math.max(...dated.map(t=>t.f));
+  state.min = new Date(min); state.max = new Date(max);
+  setRange();
+
+  const p = data.project;
+  $('#pTitle').textContent = p.title || p.fileName;
+  $('#pFile').textContent = `${p.fileName}${p.lastSaved ? ' · last saved '+fmt(parse(p.lastSaved)) : ''}${p.author ? ' by '+p.author : ''}`;
+  document.title = `${p.title || p.fileName} – Project Viewer`;
+  const leaves = tasks.filter(t=>!t.summary && !t.blank && t.name);
+  const work = leaves.reduce((a,t)=>a+(t.durationDays||0),0);
+  const pct = work ? leaves.reduce((a,t)=>a+(t.durationDays||0)*t.pct,0)/work : 0;
+  const crit = leaves.filter(t=>t.critical).length;
+  const span = Math.round((max-min)/DAY)+1;
+  $('#facts').innerHTML = [
+    [fmt(state.min), 'Start'], [fmt(state.max), 'Finish'], [`${span} days`, 'Calendar span'],
+    [leaves.length, 'Tasks'], [crit, 'Critical'], [`${Math.round(pct)}%`, 'Complete']
+  ].map(([b,s])=>`<div class="fact"><b>${b}</b><span>${s}</span></div>`).join('');
+  document.body.classList.add('loaded');
+  render();
+  requestAnimationFrame(()=>$('#board').scrollTo({left:0,top:0}));
+}
+
+function setRange(){
+  const z = state.zoom, pad = z==='day'?3:z==='week'?7:20;
+  let a = dayStart(new Date(state.min - pad*DAY)), b = dayStart(new Date(+state.max + (pad+1)*DAY));
+  if(z!=='day'){ a.setDate(a.getDate() - ((a.getDay()+6)%7)); }      // align to Monday
+  if(z==='month'){ a = new Date(a.getFullYear(), a.getMonth(), 1); b = new Date(b.getFullYear(), b.getMonth()+1, 1); }
+  state.t0 = +a; state.t1 = +b; state.px = ZOOM[z];
+}
+const X = d => ((+d - state.t0)/DAY) * state.px;
+
+/* ---------- visibility ---------- */
+function matches(t){
+  const q = state.q.trim().toLowerCase();
+  if(q && !(`${t.name||''} ${t.wbs||''} ${t.id} ${t.resources.join(' ')}`.toLowerCase().includes(q))) return false;
+  const now = today();
+  switch(state.filter){
+    case 'critical': return t.critical;
+    case 'notstarted': return !t.summary && t.pct===0;
+    case 'inprogress': return !t.summary && t.pct>0 && t.pct<100;
+    case 'complete': return !t.summary && t.pct>=100;
+    case 'late': return !t.summary && t.pct<100 && t.f && t.f < now;
+    case 'manual': return t.manual;
+    case 'links': return t.preds.length>0 || state.succ.has(t.uid);
+  }
+  return true;
+}
+function visibleRows(){
+  const tasks = state.data.tasks.filter(t=>t.uid!==state.rootUid);
+  const filtering = state.q.trim() || state.filter!=='all';
+  if(filtering){
+    const show = new Map();
+    for(const t of tasks){
+      if(t.blank || !matches(t)) continue;
+      show.set(t.uid,'hit');
+      let p = t.parent; while(p!=null && p!==state.rootUid){ if(!show.has(p)) show.set(p,'ctx'); p = state.byUid.get(p)?.parent; }
+    }
+    return tasks.filter(t=>show.has(t.uid)).map(t=>({t,ctx:show.get(t.uid)==='ctx'}));
+  }
+  const out=[]; let prevShown=true;
+  for(const t of tasks){
+    if(t.blank){ if(prevShown && out.length && !out[out.length-1].t.blank) out.push({t,ctx:false}); continue; }
+    let p=t.parent, hidden=false;
+    while(p!=null){ if(state.collapsed.has(p)){hidden=true;break;} p=state.byUid.get(p)?.parent; }
+    prevShown = !hidden;
+    if(!hidden) out.push({t,ctx:false});
+  }
+  while(out.length && out[out.length-1].t.blank) out.pop();
+  return out;
+}
+
+/* ---------- render ---------- */
+const caretSvg = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function hl(s){
+  const q = state.q.trim(); if(!q) return esc(s);
+  const i = s.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(s);
+  return esc(s.slice(0,i))+'<mark>'+esc(s.slice(i,i+q.length))+'</mark>'+esc(s.slice(i+q.length));
+}
+
+function render(){
+  const rows = visibleRows(); state.rows = rows;
+  const W = X(state.t1), H = rows.length * 30;
+  const baseLevel = state.rootUid!=null ? 1 : 0;
+  const z = state.zoom, now = today();
+  $('#count').textContent = `${rows.filter(r=>!r.t.blank && !r.ctx).length} of ${state.data.tasks.filter(t=>!t.blank && t.uid!==state.rootUid).length} rows`;
+
+  // scale
+  let t1='', t2='', bg='';
+  for(let d=new Date(state.t0); +d<state.t1; d.setDate(d.getDate()+1)){
+    const x = X(d), dow = d.getDay(), we = dow===0||dow===6;
+    if(z!=='month' && we) bg += `<i class="we" style="left:${x}px;width:${state.px}px"></i>`;
+    if(z==='day'){
+      t2 += `<span class="${we?'we':''}" style="left:${x}px;width:${state.px}px;padding-left:0;text-align:center">${d.getDate()}</span>`;
+      if(dow===1) bg += `<i class="ln" style="left:${x}px"></i>`;
+    }
+    if(z==='week' && dow===1){
+      t2 += `<span style="left:${x}px;width:${7*state.px}px">${d.getDate()}</span>`;
+      bg += `<i class="ln" style="left:${x}px"></i>`;
+    }
+    if(d.getDate()===1 || +d===state.t0){
+      if(z==='month'){
+        const days = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+        t2 += `<span style="left:${x}px;width:${days*state.px}px">${MO[d.getMonth()]}</span>`;
+        bg += `<i class="ln" style="left:${x}px"></i>`;
+        if(d.getMonth()===0 || +d===state.t0){ const next = new Date(d.getFullYear()+1,0,1); t1 += `<span style="left:${x}px;width:${X(Math.min(+next,state.t1))-x}px">${d.getFullYear()}</span>`; }
+      } else {
+        const next = new Date(d.getFullYear(), d.getMonth()+1, 1);
+        const w1 = X(Math.min(+next,state.t1))-x;
+        t1 += `<span style="left:${x}px;width:${w1}px">${w1>70?MO[d.getMonth()]+' '+d.getFullYear():''}</span>`;
+      }
+    }
+  }
+  if(+now>=state.t0 && +now<=state.t1) bg += `<i class="today" style="left:${X(now)}px" title="Today"></i>`;
+
+  // rows
+  const showLabels = z!=='month';
+  let html = '';
+  rows.forEach(({t,ctx},i)=>{
+    if(t.blank){ html += `<div class="row blank" aria-hidden="true"><div class="left"></div><div class="lane" style="width:${W}px"></div></div>`; return; }
+    const lvl = Math.max(0,t.level-baseLevel-1);
+    const hasKids = state.kids.has(t.uid);
+    const filtering = state.q.trim() || state.filter!=='all';
+    const open = !state.collapsed.has(t.uid);
+    const caret = hasKids && !filtering ? `<button class="caret" data-c="${t.uid}" aria-expanded="${open}" aria-label="${open?'Collapse':'Expand'} ${esc(t.name)}">${caretSvg}</button>` : `<span class="caret none"></span>`;
+    const tags = (t.critical?'<span class="tag crit" title="On the critical path">Critical</span>':'') ;
+    let bar='';
+    if(t.s && t.f){
+      const x = X(t.s), w = Math.max(2, X(t.f)-x);
+      const tip = `data-tip="${t.uid}"`;
+      if(t.milestone) bar = `<div class="ms ${t.critical?'crit':''}" style="left:${x}px" ${tip}></div>`;
+      else bar = `<div class="bar ${t.summary?'sumbar':''} ${t.critical?'crit':''} ${t.manual?'man':''}" style="left:${x}px;width:${w}px" ${tip}><div class="fill" style="width:${Math.min(100,t.pct)}%"></div></div>`;
+      if(t.summary && t.span && (+t.span[0]<+t.s || +t.span[1]>+t.f)) bar += `<div class="rollup" style="left:${X(t.span[0])}px;width:${Math.max(2,X(t.span[1])-X(t.span[0]))}px" title="Subtasks run ${fmt(t.span[0])} to ${fmt(t.span[1])}"></div>`;
+      if(t.bs && t.bf) bar += `<div class="base" style="left:${X(t.bs)}px;width:${Math.max(2,X(t.bf)-X(t.bs))}px"></div>`;
+      if(showLabels && !t.summary){
+        const lab = t.resources.length ? t.resources.join(', ') : '';
+        if(lab) bar += `<div class="blabel" style="left:${x+w+(t.milestone?10:9)}px">${esc(lab)}</div>`;
+      }
+    }
+    html += `<div class="row ${t.summary?'sum':''} l${lvl} ${ctx?'ctx':''} ${state.sel===t.uid?'sel':''}" data-uid="${t.uid}" data-i="${i}" tabindex="0">
+      <div class="left"><div class="cols">
+        <div class="idc">${t.id??''}</div>
+        <div class="nm" style="padding-left:${4+lvl*16}px">${caret}<span class="lbl" title="${esc(t.name||'')}">${t.name?hl(t.name):'<i style="color:var(--ink-3)">Untitled task</i>'}</span>${tags}</div>
+        <div class="r">${esc(dur(t))}</div>
+        <div>${fmt(t.s)}</div><div>${fmt(t.f)}</div>
+        <div class="r">${Math.round(t.pct)}%</div>
+      </div></div>
+      <div class="lane" style="width:${W}px">${bar}</div></div>`;
+  });
+
+  // dependency lines
+  let paths='';
+  if(state.links){
+    const idx = new Map(rows.map((r,i)=>[r.t.uid,i]));
+    for(const {t} of rows){
+      for(const p of t.preds){
+        if(!idx.has(p.uid)) continue;
+        const a = state.byUid.get(p.uid); if(!a.s||!t.s) continue;
+        const ya = idx.get(p.uid)*30+15, yb = idx.get(t.uid)*30+15;
+        const type = p.type||'FS';
+        const xa = type[0]==='S' ? X(a.s) : X(a.f);
+        const xb = type[1]==='S' ? X(t.s) : X(t.f);
+        const dir = type[1]==='S' ? 1 : -1;        // arrive from left for *S, from right for *F
+        const out = type[0]==='S' ? -6 : 6;
+        const crit = a.critical && t.critical ? 'crit' : '';
+        const yMid = yb + (yb>ya ? -15 : 15);
+        // Straight drop when the successor starts after the predecessor ends, otherwise an S-shaped elbow
+        const d = (dir===1 && type[0]==='F' && xb-10 >= xa+6)
+          ? `M${xa} ${ya}H${xb-10}V${yb}H${xb-2}`
+          : `M${xa} ${ya}h${out}V${yMid}H${xb-dir*10}V${yb}H${xb-dir*2}`;
+        const ah = dir===1 ? `M${xb-6} ${yb-3.5}L${xb} ${yb}L${xb-6} ${yb+3.5}Z` : `M${xb+6} ${yb-3.5}L${xb} ${yb}L${xb+6} ${yb+3.5}Z`;
+        paths += `<path class="${crit}" d="${d}"/><path class="ah ${crit}" d="${ah}"/>`;
+      }
+    }
+  }
+
+  const left = getComputedStyle(document.documentElement).getPropertyValue('--left').trim();
+  $('#sheet').style.width = `calc(${left} + ${W}px)`;
+  $('#sheet').innerHTML = `
+    <div class="hrow"><div class="hleft"><div class="cols"><div>ID</div><div>Task name</div><div class="r">Duration</div><div>Start</div><div>Finish</div><div class="r">Done</div></div></div>
+      <div class="scale" style="width:${W}px"><div class="t1">${t1}</div><div class="t2">${t2}</div></div></div>
+    <div class="bg" style="left:${left};width:${W}px;height:${H}px">${bg}</div>
+    <svg class="links" style="left:${left}" width="${W}" height="${H}">${paths}</svg>
+    <div class="rows">${html}</div>`;
+}
+
+/* ---------- interactions ---------- */
+$('#sheet').addEventListener('click', e=>{
+  const c = e.target.closest('.caret[data-c]');
+  if(c){ const u=+c.dataset.c; state.collapsed.has(u)?state.collapsed.delete(u):state.collapsed.add(u); render(); e.stopPropagation(); return; }
+  const row = e.target.closest('.row[data-uid]'); if(row){ const u=+row.dataset.uid; openDrawer(u); revealBar(u); }
+});
+$('#sheet').addEventListener('keydown', e=>{
+  const row = e.target.closest('.row[data-uid]'); if(!row) return;
+  const u = +row.dataset.uid;
+  if(e.key==='Enter'){ openDrawer(u); }
+  else if(e.key==='ArrowDown' || e.key==='ArrowUp'){ e.preventDefault(); let n=row; do{ n = e.key==='ArrowDown'? n.nextElementSibling : n.previousElementSibling; }while(n && !n.dataset.uid); n?.focus(); }
+  else if((e.key==='ArrowLeft'||e.key==='ArrowRight') && state.kids.has(u)){ e.key==='ArrowLeft'?state.collapsed.add(u):state.collapsed.delete(u); render(); document.querySelector(`.row[data-uid="${u}"]`)?.focus(); }
+});
+let qT; $('#q').addEventListener('input', e=>{ clearTimeout(qT); qT=setTimeout(()=>{ state.q=e.target.value; render(); },120); });
+$('#filter').onchange = e=>{ state.filter=e.target.value; render(); };
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+  const board=$('#board'), lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const centerT = state.t0 + ((board.scrollLeft + (board.clientWidth-lw)/2)/state.px)*DAY;
+  state.zoom=b.dataset.z; document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed', x===b)); setRange(); render();
+  board.scrollLeft = Math.max(0, X(centerT) - (board.clientWidth-lw)/2);
+});
+$('#expand').onclick=()=>{ state.collapsed.clear(); render(); };
+$('#collapse').onclick=()=>{ state.collapsed = new Set([...state.kids.keys()].filter(u=>u!==state.rootUid)); render(); };
+$('#showLinks').onchange=e=>{ state.links=e.target.checked; render(); };
+$('#today').onclick=()=>{
+  const board=$('#board'), lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const now=today();
+  if(+now<state.t0 || +now>state.t1){ flash(`Today (${fmt(now)}) is outside this schedule, which runs ${fmt(state.min)} to ${fmt(state.max)}.`); board.scrollLeft = +now<state.t0 ? 0 : board.scrollWidth; return; }
+  board.scrollTo({left: Math.max(0, X(now)-(board.clientWidth-lw)/2), behavior:'smooth'});
+};
+function flash(msg){ const t=$('#tip'); t.innerHTML=esc(msg); t.style.display='block'; const r=$('#today').getBoundingClientRect(); t.style.left=Math.max(8,Math.min(innerWidth-330,r.left-120))+'px'; t.style.top=(r.bottom+8)+'px'; clearTimeout(flash.t); flash.t=setTimeout(()=>t.style.display='none',3500); }
+
+// tooltip on bars
+const tip=$('#tip');
+$('#sheet').addEventListener('mousemove', e=>{
+  const el = e.target.closest('[data-tip]');
+  if(!el){ tip.style.display='none'; return; }
+  const t = state.byUid.get(+el.dataset.tip);
+  tip.innerHTML = `<b>${esc(t.name)}</b><span>${fmt(t.s)} → ${fmt(t.f)} · ${esc(dur(t))} · ${Math.round(t.pct)}% done</span>${t.critical?'<br><span style="color:#F1C9C0">Critical path</span>':''}`;
+  tip.style.display='block';
+  const x = Math.min(e.clientX+14, innerWidth-tip.offsetWidth-8), y = e.clientY+16 + tip.offsetHeight > innerHeight ? e.clientY-tip.offsetHeight-10 : e.clientY+16;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+});
+$('#sheet').addEventListener('mouseleave',()=>tip.style.display='none');
+
+/* ---------- drawer ---------- */
+const TYPE = {FS:'Finish-to-start',SS:'Start-to-start',FF:'Finish-to-finish',SF:'Start-to-finish'};
+function linkList(items){
+  if(!items.length) return '<p class="none">None</p>';
+  return '<ul>'+items.map(it=>{ const t=state.byUid.get(it.uid); return `<li><button data-go="${t.uid}"><span>${t.id}</span><span>${esc(t.name)}</span><span class="rt">${it.type||'FS'}${it.lag?' '+esc(it.lag):''}</span></button></li>`; }).join('')+'</ul>';
+}
+function openDrawer(uid){
+  const t = state.byUid.get(uid); if(!t || t.blank) return;
+  state.sel = uid;
+  document.querySelectorAll('.row.sel').forEach(r=>r.classList.remove('sel'));
+  document.querySelector(`.row[data-uid="${uid}"]`)?.classList.add('sel');
+  const path=[]; let p=t.parent; while(p!=null && p!==state.rootUid){ const pt=state.byUid.get(p); if(!pt) break; path.unshift(pt.name); p=pt.parent; }
+  const kind = t.milestone?'Milestone':t.summary?'Summary task':'Task';
+  const rows = [
+    ['Type', `${kind}${t.manual?', manually scheduled':''}${t.active?'':' (inactive)'}`],
+    t.summary && t.span && (+t.span[0]<+t.s || +t.span[1]>+t.f) && ['Subtasks run', `${fmt(t.span[0])} → ${fmt(t.span[1])}<br><span class="none">Outside this summary's own dates</span>`],
+    ['Start', fmtLong(t.s)], ['Finish', fmtLong(t.f)], ['Duration', esc(dur(t))],
+    ['Progress', `${Math.round(t.pct)}%<div class="meter"><i style="width:${Math.min(100,t.pct)}%"></i></div>`],
+    ['Critical path', t.critical?'<span style="color:var(--crit);font-weight:600">Yes</span>':'No'],
+    t.totalSlack && ['Total slack', esc(t.totalSlack.replace(/\.0(?=[a-z])/,''))],
+    (t.actualStart||t.actualFinish) && ['Actual', `${fmtLong(parse(t.actualStart))}<br>${t.actualFinish?fmtLong(parse(t.actualFinish)):'not finished'}`],
+    (t.bs||t.bf) && ['Baseline', `${fmt(t.bs)} → ${fmt(t.bf)}`],
+    t.work && parseFloat(t.work) !== 0 && ['Work', esc(t.work.replace(/\.0h$/,'h'))],
+    t.cost ? ['Cost', t.cost.toLocaleString(undefined,{maximumFractionDigits:2})] : null,
+    ['Resources', t.resources.length?esc(t.resources.join(', ')):'<span class="none">None assigned</span>'],
+  ].filter(Boolean);
+  const kids = (state.kids.get(uid)||[]).map(u=>state.byUid.get(u)).filter(k=>!k.blank);
+  $('#drawer').innerHTML = `
+    <header><div style="flex:1;min-width:0"><div class="wbs">ID ${t.id} · WBS ${esc(t.wbs||'—')}${path.length?' · '+esc(path.join(' › ')):''}</div><h3>${esc(t.name)}</h3></div>
+      <button class="x" id="close" aria-label="Close details"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></header>
+    <div class="body">
+      <dl>${rows.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>
+      <h4>Predecessors</h4>${linkList(t.preds)}
+      <h4>Successors</h4>${linkList(state.succ.get(uid)||[])}
+      ${kids.length?`<h4>Subtasks (${kids.length})</h4>${linkList(kids.map(k=>({uid:k.uid,type:fmt(k.s)})))}`:''}
+      <h4>Notes</h4>${t.notes?`<div class="notes">${esc(t.notes)}</div>`:'<p class="none">No notes</p>'}
+    </div>`;
+  $('#drawer').classList.add('open'); $('#drawer').setAttribute('aria-hidden','false');
+  $('#close').onclick = closeDrawer;
+  $('#drawer').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>goTo(+b.dataset.go));
+}
+function revealBar(uid){
+  const t=state.byUid.get(uid), board=$('#board'); if(!t?.s) return;
+  const lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const x0=X(t.s), x1=X(t.f), vw=board.clientWidth-lw-Math.min(400,innerWidth);
+  if(x1 < board.scrollLeft || x0 > board.scrollLeft+Math.max(200,vw)) board.scrollTo({left:Math.max(0,x0-80),behavior:'smooth'});
+}
+function closeDrawer(){ $('#drawer').classList.remove('open'); $('#drawer').setAttribute('aria-hidden','true'); const u=state.sel; state.sel=null; document.querySelectorAll('.row.sel').forEach(r=>r.classList.remove('sel')); if(u!=null) document.querySelector(`.row[data-uid="${u}"]`)?.focus(); }
+function goTo(uid){
+  let p = state.byUid.get(uid).parent, changed=false;
+  while(p!=null){ if(state.collapsed.delete(p)) changed=true; p=state.byUid.get(p)?.parent; }
+  if(!state.rows.some(r=>r.t.uid===uid)){ state.q=''; $('#q').value=''; state.filter='all'; $('#filter').value='all'; changed=true; }
+  if(changed) render();
+  const row = document.querySelector(`.row[data-uid="${uid}"]`), board=$('#board');
+  if(row){ const lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left')); const t=state.byUid.get(uid);
+    board.scrollTo({top: row.offsetTop - board.clientHeight/2, left: t.s?Math.max(0,X(t.s)-80):board.scrollLeft, behavior:'smooth'}); }
+  openDrawer(uid);
+}
+addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#drawer').classList.contains('open')) closeDrawer(); });
+
+/* ---------- export ---------- */
+$('#csv').onclick = ()=>{
+  const cols = ['ID','WBS','Level','Name','Summary','Milestone','Critical','Manual','Duration','Start','Finish','% Complete','Total slack','Predecessors','Resources','Notes'];
+  const q = v => { v = v==null ? '' : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
+  const lines = [cols.join(',')];
+  for(const {t,ctx} of state.rows){ if(t.blank) continue;
+    lines.push([t.id,t.wbs,t.level,t.name,t.summary,t.milestone,t.critical,t.manual,dur(t),t.start,t.finish,t.pct,t.totalSlack,
+      t.preds.map(p=>`${state.byUid.get(p.uid).id}${p.type&&p.type!=='FS'?p.type:''}${p.lag?(p.lag.startsWith('-')?'':'+')+p.lag:''}`).join(';'),
+      t.resources.join(';'), t.notes].map(q).join(','));
+  }
+  const blob = new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download = (state.data.project.fileName||'project').replace(/\.[^.]+$/,'') + '.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+addEventListener('resize', ()=>{ if(state.data) render(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F4; --sheet:#FFFFFF; --ink:#1C2A33; --ink-2:#4F5F68; --ink-3:#7F8C92;
+  --rule:#DCE3E2; --rule-2:#EBF0EF; --weekend:#EEF2F1;
+  --teal-d:#0E5E6F; --teal:#3A8FA3; --teal-l:#BFDDE4;
+  --crit:#C2452D; --crit-l:#F1C9C0; --today:#D99A00; --sel:#E2EFF2;
+  --row:30px; --left:700px;
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--sans);font-variant-numeric:tabular-nums;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal-d);outline-offset:2px}
+
+/* ---------- top bar ---------- */
+header.top{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--rule);background:var(--sheet);min-height:64px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;white-space:nowrap}
+.brand svg{flex:none}
+.proj{display:none;flex-direction:column;min-width:0;padding-left:16px;border-left:1px solid var(--rule)}
+.proj h1{margin:0;font-size:20px;line-height:1.2;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj .file{color:var(--ink-3);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facts{display:none;gap:22px;margin-left:auto;flex-wrap:wrap}
+.fact{display:flex;flex-direction:column}
+.fact b{font-size:17px;font-weight:600;line-height:1.2}
+.fact span{font-size:12px;color:var(--ink-3)}
+.loaded .proj,.loaded .facts{display:flex}
+.btn.openbtn{display:none}.loaded .btn.openbtn{display:inline-flex}
+
+/* ---------- drop zone ---------- */
+#empty{flex:1;display:grid;place-items:center;padding:24px}
+.drop{width:min(640px,100%);border:2px dashed #AFC0BF;border-radius:14px;background:var(--sheet);padding:56px 32px;text-align:center;transition:border-color .15s,background .15s}
+.drop.over,body.dragging .drop{border-color:var(--teal-d);background:#F5FAFB}
+.drop h2{margin:18px 0 6px;font-size:24px;font-weight:600;letter-spacing:-.015em}
+.drop p{margin:0 auto;color:var(--ink-2);max-width:44ch}
+.drop .types{margin-top:22px;font-size:12.5px;color:var(--ink-3)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--rule);background:var(--sheet);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#B8C6C5;background:#F8FAFA}
+.btn.primary{background:var(--teal-d);border-color:var(--teal-d);color:#fff;padding:10px 18px;font-weight:500}
+.btn.primary:hover{background:#0B4E5D}
+.drop .btn.primary{margin-top:24px}
+.err{margin-top:18px;color:var(--crit);font-weight:500}
+.busy{display:none;margin-top:22px;color:var(--ink-2)}
+.drop.loading .busy{display:block}.drop.loading .btn{display:none}
+.cell-anim{display:inline-block;width:52px;height:20px;border:2px solid var(--teal-d);border-radius:4px;position:relative;vertical-align:middle;margin-right:10px}
+.cell-anim::after{content:"";position:absolute;right:-6px;top:4px;width:4px;height:8px;background:var(--teal-d);border-radius:0 2px 2px 0}
+.cell-anim i{position:absolute;inset:2px auto 2px 2px;background:var(--teal);border-radius:1px;animation:charge 1.4s ease-in-out infinite}
+@keyframes charge{0%{width:0}100%{width:calc(100% - 4px)}}
+
+/* ---------- toolbar ---------- */
+#app{display:none;flex:1;min-height:0;flex-direction:column}
+.loaded #app{display:flex}.loaded #empty{display:none}
+.toolbar{display:flex;gap:6px;align-items:center;padding:10px 20px;flex-wrap:wrap;border-bottom:1px solid var(--rule);background:var(--paper)}
+.search{position:relative;flex:0 1 280px;min-width:180px}
+.search input{width:100%;border:1px solid var(--rule);border-radius:7px;padding:6px 10px 6px 32px;background:var(--sheet)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+select{border:1px solid var(--rule);border-radius:7px;padding:6px 8px;background:var(--sheet)}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--sheet)}
+.seg button{border:0;background:none;padding:6px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.spacer{flex:1}
+.check{display:inline-flex;gap:6px;align-items:center;cursor:pointer;user-select:none;color:var(--ink-2)}
+.check input{accent-color:var(--teal-d)}
+.count{color:var(--ink-3);font-size:12.5px}
+
+/* ---------- board ---------- */
+.board{flex:1;min-height:0;overflow:auto;position:relative;background:var(--sheet)}
+.sheet{position:relative}
+.hrow{position:sticky;top:0;z-index:5;display:flex;height:52px;background:var(--sheet);border-bottom:1px solid var(--rule)}
+.hleft{position:sticky;left:0;z-index:6;flex:none;width:var(--left);display:grid;align-items:end;background:var(--sheet);border-right:1px solid var(--rule)}
+.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 84px 106px 106px 50px}
+.hleft .cols>div{padding:0 8px 7px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.hleft .cols>div.r,.row .r{text-align:right}
+.scale{position:relative;flex:none;height:52px}
+.scale .t1,.scale .t2{position:absolute;left:0;right:0;height:26px}
+.scale .t1{top:0;border-bottom:1px solid var(--rule-2)}.scale .t2{top:26px}
+.scale span{position:absolute;top:0;height:26px;line-height:26px;padding-left:6px;font-size:12px;color:var(--ink-2);border-left:1px solid var(--rule-2);white-space:nowrap;overflow:hidden}
+.scale .t1 span{font-weight:500;color:var(--ink)}
+.scale .t2 span{font-size:11.5px}
+.scale .t2 span.we{color:var(--ink-3)}
+
+.rows{position:relative}
+.row{display:flex;height:var(--row);border-bottom:1px solid var(--rule-2);cursor:pointer}
+.row .left{position:sticky;left:0;z-index:3;flex:none;width:var(--left);background:var(--sheet);border-right:1px solid var(--rule)}
+.row .cols{height:100%;align-items:center}
+.row .cols>div{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.row .idc{color:var(--ink-3);font-size:12px}
+.row .nm{display:flex;align-items:center;gap:4px}
+.row .nm .lbl{overflow:hidden;text-overflow:ellipsis}
+.row.sum .nm{font-weight:600}
+.row.sum.l1 .nm{text-transform:none}
+.row:hover .left,.row:hover .lane{background:#F7FAFA}
+.row.sel .left,.row.sel .lane{background:var(--sel)}
+.row.ctx .nm .lbl{color:var(--ink-3)}
+.row.blank{cursor:default}
+.row.blank .left{background:var(--sheet)}
+.caret{flex:none;width:20px;height:20px;border:0;background:none;padding:0;display:grid;place-items:center;cursor:pointer;border-radius:4px;color:var(--ink-2)}
+.caret:hover{background:var(--rule-2)}
+.caret svg{transition:transform .15s}
+.caret[aria-expanded=false] svg{transform:rotate(-90deg)}
+.caret.none{visibility:hidden}
+.tag{flex:none;font-size:10.5px;font-weight:600;padding:0 5px;border-radius:3px;line-height:16px}
+.tag.crit{background:var(--crit-l);color:#8E2E1B}
+.tag.man{border:1px dashed var(--ink-3);color:var(--ink-2);font-weight:500}
+.lane{position:relative;flex:none;height:100%}
+mark{background:#FCE9B2;color:inherit;border-radius:2px}
+
+/* grid lines + weekends + today live behind the rows */
+.bg{position:absolute;top:52px;bottom:0;z-index:0;pointer-events:none}
+.bg i{position:absolute;top:0;bottom:0}
+.bg i.we{background:var(--weekend)}
+.bg i.ln{width:1px;background:var(--rule-2)}
+.bg i.today{width:2px;background:var(--today);z-index:2}
+.rows,.hrow{z-index:1}
+.row .lane{background:transparent}
+
+/* bars */
+.bar{position:absolute;top:8px;height:14px;border-radius:3px;background:var(--teal-l);border:1.5px solid var(--teal);overflow:visible}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:1px}
+.bar::after{content:"";position:absolute;right:-4.5px;top:3px;width:3px;height:5px;background:var(--teal);border-radius:0 1.5px 1.5px 0}
+.bar.crit{background:var(--crit-l);border-color:var(--crit)}
+.bar.crit .fill,.bar.crit::after{background:var(--crit)}
+.bar.man{border-style:dashed}
+.bar.sumbar{top:10px;height:8px;border:0;border-radius:0;background:var(--teal-d)}
+.bar.sumbar::after{display:none}
+.bar.sumbar::before{content:"";position:absolute;inset:8px 0 auto 0;height:5px;border-left:2px solid var(--teal-d);border-right:2px solid var(--teal-d)}
+.bar.sumbar.crit{background:var(--crit)}
+.bar.sumbar.man{background:repeating-linear-gradient(90deg,var(--teal-d) 0 6px,#6E9EA8 6px 9px)}
+.bar.sumbar .fill{display:none}
+.ms{position:absolute;top:8px;width:13px;height:13px;transform:translateX(-6.5px) rotate(45deg);background:var(--ink)}
+.ms.crit{background:var(--crit)}
+.rollup{position:absolute;top:23px;height:4px;background:repeating-linear-gradient(90deg,#8FB3BB 0 4px,transparent 4px 6px)}
+.base{position:absolute;top:24px;height:3px;background:#A9B5B9;border-radius:2px}
+.blabel{position:absolute;top:6px;font-size:12px;color:var(--ink-2);white-space:nowrap;pointer-events:none}
+svg.links{position:absolute;top:52px;z-index:1;pointer-events:none;overflow:visible}
+svg.links path{fill:none;stroke:#6C7C83;stroke-width:1.2}
+svg.links path.crit{stroke:var(--crit)}
+svg.links path.ah{fill:#6C7C83;stroke:none}svg.links path.ah.crit{fill:var(--crit)}
+
+/* tooltip */
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:#fff;border-radius:7px;padding:8px 10px;font-size:12.5px;max-width:320px;box-shadow:0 6px 20px rgba(28,42,51,.25);display:none}
+.tip b{display:block;font-weight:600;margin-bottom:2px}
+.tip span{color:#B9C6CB}
+
+/* detail drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--sheet);border-left:1px solid var(--rule);box-shadow:-12px 0 32px rgba(28,42,51,.12);z-index:40;transform:translateX(100%);transition:transform .2s ease;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer header{display:flex;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid var(--rule)}
+.drawer h3{margin:0;font-size:17px;line-height:1.3;font-weight:600;flex:1}
+.drawer .wbs{color:var(--ink-3);font-size:12.5px;margin-bottom:3px}
+.drawer .body{overflow:auto;padding:16px 20px 28px}
+.drawer dl{display:grid;grid-template-columns:120px 1fr;gap:7px 12px;margin:0}
+.drawer dt{color:var(--ink-3)}
+.drawer dd{margin:0}
+.drawer h4{margin:22px 0 8px;font-size:13px;font-weight:600}
+.drawer ul{list-style:none;margin:0;padding:0}
+.drawer li button{width:100%;text-align:left;border:1px solid var(--rule);background:none;border-radius:6px;padding:6px 9px;margin-bottom:5px;cursor:pointer;display:flex;gap:8px}
+.drawer li button:hover{background:#F7FAFA}
+.drawer li .rt{margin-left:auto;color:var(--ink-3);font-size:12px;white-space:nowrap}
+.drawer .notes{white-space:pre-wrap;background:var(--paper);border-radius:6px;padding:10px 12px}
+.drawer .none{color:var(--ink-3)}
+.x{border:0;background:none;width:30px;height:30px;border-radius:6px;cursor:pointer;display:grid;place-items:center;color:var(--ink-2)}
+.x:hover{background:var(--rule-2)}
+.meter{height:8px;border-radius:4px;background:var(--teal-l);overflow:hidden;margin-top:6px;width:140px}
+.meter i{display:block;height:100%;background:var(--teal)}
+
+.hint{position:fixed;inset:0;z-index:60;background:rgba(14,94,111,.12);border:3px dashed var(--teal-d);display:none;place-items:center;font-size:20px;font-weight:600;color:var(--teal-d)}
+body.dragging.loaded .hint{display:grid}
+
+@media (max-width:900px){
+  :root{--left:300px}
+  #expand,#collapse,.check,#today{display:none}
+  .cols{grid-template-columns:40px minmax(0,1fr) 60px}
+  .cols>div:nth-child(n+4){display:none}
+  .facts{margin-left:0;width:100%;gap:16px}
+  .proj{border-left:0;padding-left:0}
+  header.top,.toolbar{padding-left:16px;padding-right:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="26" height="18" viewBox="0 0 26 18" aria-hidden="true"><rect x="1" y="1" width="21" height="16" rx="3" fill="none" stroke="#0E5E6F" stroke-width="2"/><rect x="23" y="5.5" width="2.5" height="7" rx="1" fill="#0E5E6F"/><rect x="4" y="4" width="10" height="10" rx="1" fill="#3A8FA3"/></svg>
+    Project Viewer
+  </div>
+  <div class="proj"><h1 id="pTitle"></h1><div class="file" id="pFile"></div></div>
+  <div class="facts" id="facts"></div>
+  <button class="btn openbtn" id="another">Open another file</button>
+</header>
+
+<main id="empty">
+  <div class="drop" id="drop">
+    <svg width="78" height="52" viewBox="0 0 78 52" aria-hidden="true"><rect x="2" y="2" width="66" height="48" rx="6" fill="#fff" stroke="#0E5E6F" stroke-width="3"/><rect x="70" y="16" width="6" height="20" rx="2" fill="#0E5E6F"/><rect x="10" y="12" width="26" height="6" rx="2" fill="#0E5E6F"/><rect x="18" y="23" width="30" height="6" rx="2" fill="#3A8FA3"/><rect x="30" y="34" width="28" height="6" rx="2" fill="#C2452D"/></svg>
+    <h2>Drop a Microsoft Project file here</h2>
+    <p>See the task list, timeline and dependencies without opening Project. The file is read once and isn't kept.</p>
+    <button class="btn primary" id="pick">Choose a file</button>
+    <div class="busy"><span class="cell-anim"><i></i></span>Reading <span id="busyName"></span>…</div>
+    <div class="err" id="err" role="alert"></div>
+    <div class="types">.mpp from Project 98 to 2021 and Project Online, plus Project XML, MPX and Primavera XER</div>
+  </div>
+  <input type="file" id="file" hidden accept=".mpp,.mpt,.xml,.mpx,.xer,.pmxml,.pp,.gan,.planner,.pod,.cdpx,.sdef">
+</main>
+
+<section id="app">
+  <div class="toolbar">
+    <label class="search"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Search tasks" aria-label="Search tasks"></label>
+    <select id="filter" aria-label="Show">
+      <option value="all">All tasks</option>
+      <option value="critical">Critical tasks</option>
+      <option value="notstarted">Not started</option>
+      <option value="inprogress">In progress</option>
+      <option value="complete">Complete</option>
+      <option value="late">Should have finished by today</option>
+      <option value="manual">Manually scheduled</option>
+      <option value="links">Has dependencies</option>
+    </select>
+    <div class="seg" role="group" aria-label="Timeline scale">
+      <button data-z="day" aria-pressed="false">Days</button><button data-z="week" aria-pressed="true">Weeks</button><button data-z="month" aria-pressed="false">Months</button>
+    </div>
+    <button class="btn" id="expand">Expand all</button>
+    <button class="btn" id="collapse">Collapse all</button>
+    <label class="check"><input type="checkbox" id="showLinks" checked> Dependency lines</label>
+    <span class="count" id="count"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="today">Go to today</button>
+    <button class="btn" id="csv">Export CSV</button>
+  </div>
+  <div class="board" id="board"><div class="sheet" id="sheet"></div></div>
+</section>
+
+<aside class="drawer" id="drawer" aria-label="Task details" aria-hidden="true"></aside>
+<div class="tip" id="tip"></div>
+<div class="hint">Drop to open this file</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const DAY = 864e5;
+const ZOOM = { day: 30, week: 13, month: 4.2 };
+const state = { data:null, byUid:new Map(), kids:new Map(), succ:new Map(), collapsed:new Set(), zoom:'week', q:'', filter:'all', links:true, sel:null, t0:0, t1:0 };
+
+/* ---------- dates ---------- */
+const parse = s => { if(!s) return null; const [d,t='00:00'] = s.split('T'); const [y,m,dd]=d.split('-').map(Number); const [h,mi]=t.split(':').map(Number); return new Date(y,m-1,dd,h,mi); };
+const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmt = d => d ? `${WD[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}` : '';
+const fmtLong = d => d ? `${WD[d.getDay()]} ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '—';
+const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dur = t => { if(t.durationDays!=null){ const d=Math.round(t.durationDays*10)/10; return d===1?'1 day':`${d} days`; } return t.duration||''; };
+const today = () => new Date();
+
+/* ---------- loading ---------- */
+const drop = $('#drop'), fileIn = $('#file');
+$('#pick').onclick = () => fileIn.click();
+$('#another').onclick = () => fileIn.click();
+fileIn.onchange = () => fileIn.files[0] && upload(fileIn.files[0]);
+let dragDepth = 0;
+addEventListener('dragenter', e => { if(e.dataTransfer?.types?.includes('Files')){ dragDepth++; document.body.classList.add('dragging'); }});
+addEventListener('dragleave', () => { if(--dragDepth<=0){ dragDepth=0; document.body.classList.remove('dragging'); }});
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragDepth=0; document.body.classList.remove('dragging'); const f=e.dataTransfer.files[0]; if(f) upload(f); });
+
+async function upload(file){
+  document.body.classList.remove('loaded');
+  $('#err').textContent=''; $('#busyName').textContent=file.name; drop.classList.add('loading');
+  closeDrawer();
+  try{
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch('api/parse', { method:'POST', body:fd });
+    let j; try{ j = await r.json(); }catch{ throw new Error(`The server returned an unexpected response (${r.status}).`); }
+    if(!r.ok) throw new Error(j.error || `Upload failed (${r.status}).`);
+    load(j);
+  }catch(e){
+    $('#err').textContent = e.message === 'Failed to fetch' ? "The server can't be reached. Check that it's running and try again." : e.message;
+  }finally{ drop.classList.remove('loading'); fileIn.value=''; }
+}
+
+function load(data){
+  state.data = data; state.byUid.clear(); state.kids.clear(); state.succ.clear(); state.collapsed.clear(); state.sel=null;
+  const tasks = data.tasks;
+  for(const t of tasks){
+    t.s = parse(t.start); t.f = parse(t.finish); t.bs=parse(t.baselineStart); t.bf=parse(t.baselineFinish);
+    state.byUid.set(t.uid, t);
+  }
+  for(const t of tasks){
+    if(t.parent!=null){ if(!state.kids.has(t.parent)) state.kids.set(t.parent,[]); state.kids.get(t.parent).push(t.uid); }
+    for(const p of t.preds){ if(!state.succ.has(p.uid)) state.succ.set(p.uid,[]); state.succ.get(p.uid).push({uid:t.uid,type:p.type,lag:p.lag}); }
+  }
+  const spanOf = u => { const t=state.byUid.get(u); if(t.spanDone) return t.span; t.spanDone=true;
+    let a=t.s, b=t.f; for(const k of state.kids.get(u)||[]){ const r=spanOf(k); if(r){ if(!a||r[0]<a) a=r[0]; if(!b||r[1]>b) b=r[1]; } }
+    t.span = a&&b ? [a,b] : null; return t.span; };
+  for(const t of tasks){ if(!t.blank) spanOf(t.uid); }
+  // Hide the auto "project summary" row (ID 0) if Project wrote one; show its children at top level
+  const root = tasks.find(t => t.id===0 && t.summary);
+  state.rootUid = root ? root.uid : null;
+
+  const dated = tasks.filter(t=>t.s&&t.f&&!t.blank);
+  const min = Math.min(...dated.map(t=>t.s)), max = Math.max(...dated.map(t=>t.f));
+  state.min = new Date(min); state.max = new Date(max);
+  setRange();
+
+  const p = data.project;
+  $('#pTitle').textContent = p.title || p.fileName;
+  $('#pFile').textContent = `${p.fileName}${p.lastSaved ? ' · last saved '+fmt(parse(p.lastSaved)) : ''}${p.author ? ' by '+p.author : ''}`;
+  document.title = `${p.title || p.fileName} – Project Viewer`;
+  const leaves = tasks.filter(t=>!t.summary && !t.blank && t.name);
+  const work = leaves.reduce((a,t)=>a+(t.durationDays||0),0);
+  const pct = work ? leaves.reduce((a,t)=>a+(t.durationDays||0)*t.pct,0)/work : 0;
+  const crit = leaves.filter(t=>t.critical).length;
+  const span = Math.round((max-min)/DAY)+1;
+  $('#facts').innerHTML = [
+    [fmt(state.min), 'Start'], [fmt(state.max), 'Finish'], [`${span} days`, 'Calendar span'],
+    [leaves.length, 'Tasks'], [crit, 'Critical'], [`${Math.round(pct)}%`, 'Complete']
+  ].map(([b,s])=>`<div class="fact"><b>${b}</b><span>${s}</span></div>`).join('');
+  document.body.classList.add('loaded');
+  render();
+  requestAnimationFrame(()=>$('#board').scrollTo({left:0,top:0}));
+}
+
+function setRange(){
+  const z = state.zoom, pad = z==='day'?3:z==='week'?7:20;
+  let a = dayStart(new Date(state.min - pad*DAY)), b = dayStart(new Date(+state.max + (pad+1)*DAY));
+  if(z!=='day'){ a.setDate(a.getDate() - ((a.getDay()+6)%7)); }      // align to Monday
+  if(z==='month'){ a = new Date(a.getFullYear(), a.getMonth(), 1); b = new Date(b.getFullYear(), b.getMonth()+1, 1); }
+  state.t0 = +a; state.t1 = +b; state.px = ZOOM[z];
+}
+const X = d => ((+d - state.t0)/DAY) * state.px;
+
+/* ---------- visibility ---------- */
+function matches(t){
+  const q = state.q.trim().toLowerCase();
+  if(q && !(`${t.name||''} ${t.wbs||''} ${t.id} ${t.resources.join(' ')}`.toLowerCase().includes(q))) return false;
+  const now = today();
+  switch(state.filter){
+    case 'critical': return t.critical;
+    case 'notstarted': return !t.summary && t.pct===0;
+    case 'inprogress': return !t.summary && t.pct>0 && t.pct<100;
+    case 'complete': return !t.summary && t.pct>=100;
+    case 'late': return !t.summary && t.pct<100 && t.f && t.f < now;
+    case 'manual': return t.manual;
+    case 'links': return t.preds.length>0 || state.succ.has(t.uid);
+  }
+  return true;
+}
+function visibleRows(){
+  const tasks = state.data.tasks.filter(t=>t.uid!==state.rootUid);
+  const filtering = state.q.trim() || state.filter!=='all';
+  if(filtering){
+    const show = new Map();
+    for(const t of tasks){
+      if(t.blank || !matches(t)) continue;
+      show.set(t.uid,'hit');
+      let p = t.parent; while(p!=null && p!==state.rootUid){ if(!show.has(p)) show.set(p,'ctx'); p = state.byUid.get(p)?.parent; }
+    }
+    return tasks.filter(t=>show.has(t.uid)).map(t=>({t,ctx:show.get(t.uid)==='ctx'}));
+  }
+  const out=[]; let prevShown=true;
+  for(const t of tasks){
+    if(t.blank){ if(prevShown && out.length && !out[out.length-1].t.blank) out.push({t,ctx:false}); continue; }
+    let p=t.parent, hidden=false;
+    while(p!=null){ if(state.collapsed.has(p)){hidden=true;break;} p=state.byUid.get(p)?.parent; }
+    prevShown = !hidden;
+    if(!hidden) out.push({t,ctx:false});
+  }
+  while(out.length && out[out.length-1].t.blank) out.pop();
+  return out;
+}
+
+/* ---------- render ---------- */
+const caretSvg = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function hl(s){
+  const q = state.q.trim(); if(!q) return esc(s);
+  const i = s.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(s);
+  return esc(s.slice(0,i))+'<mark>'+esc(s.slice(i,i+q.length))+'</mark>'+esc(s.slice(i+q.length));
+}
+
+function render(){
+  const rows = visibleRows(); state.rows = rows;
+  const W = X(state.t1), H = rows.length * 30;
+  const baseLevel = state.rootUid!=null ? 1 : 0;
+  const z = state.zoom, now = today();
+  $('#count').textContent = `${rows.filter(r=>!r.t.blank && !r.ctx).length} of ${state.data.tasks.filter(t=>!t.blank && t.uid!==state.rootUid).length} rows`;
+
+  // scale
+  let t1='', t2='', bg='';
+  for(let d=new Date(state.t0); +d<state.t1; d.setDate(d.getDate()+1)){
+    const x = X(d), dow = d.getDay(), we = dow===0||dow===6;
+    if(z!=='month' && we) bg += `<i class="we" style="left:${x}px;width:${state.px}px"></i>`;
+    if(z==='day'){
+      t2 += `<span class="${we?'we':''}" style="left:${x}px;width:${state.px}px;padding-left:0;text-align:center">${d.getDate()}</span>`;
+      if(dow===1) bg += `<i class="ln" style="left:${x}px"></i>`;
+    }
+    if(z==='week' && dow===1){
+      t2 += `<span style="left:${x}px;width:${7*state.px}px">${d.getDate()}</span>`;
+      bg += `<i class="ln" style="left:${x}px"></i>`;
+    }
+    if(d.getDate()===1 || +d===state.t0){
+      if(z==='month'){
+        const days = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+        t2 += `<span style="left:${x}px;width:${days*state.px}px">${MO[d.getMonth()]}</span>`;
+        bg += `<i class="ln" style="left:${x}px"></i>`;
+        if(d.getMonth()===0 || +d===state.t0){ const next = new Date(d.getFullYear()+1,0,1); t1 += `<span style="left:${x}px;width:${X(Math.min(+next,state.t1))-x}px">${d.getFullYear()}</span>`; }
+      } else {
+        const next = new Date(d.getFullYear(), d.getMonth()+1, 1);
+        const w1 = X(Math.min(+next,state.t1))-x;
+        t1 += `<span style="left:${x}px;width:${w1}px">${w1>70?MO[d.getMonth()]+' '+d.getFullYear():''}</span>`;
+      }
+    }
+  }
+  if(+now>=state.t0 && +now<=state.t1) bg += `<i class="today" style="left:${X(now)}px" title="Today"></i>`;
+
+  // rows
+  const showLabels = z!=='month';
+  let html = '';
+  rows.forEach(({t,ctx},i)=>{
+    if(t.blank){ html += `<div class="row blank" aria-hidden="true"><div class="left"></div><div class="lane" style="width:${W}px"></div></div>`; return; }
+    const lvl = Math.max(0,t.level-baseLevel-1);
+    const hasKids = state.kids.has(t.uid);
+    const filtering = state.q.trim() || state.filter!=='all';
+    const open = !state.collapsed.has(t.uid);
+    const caret = hasKids && !filtering ? `<button class="caret" data-c="${t.uid}" aria-expanded="${open}" aria-label="${open?'Collapse':'Expand'} ${esc(t.name)}">${caretSvg}</button>` : `<span class="caret none"></span>`;
+    const tags = (t.critical?'<span class="tag crit" title="On the critical path">Critical</span>':'') ;
+    let bar='';
+    if(t.s && t.f){
+      const x = X(t.s), w = Math.max(2, X(t.f)-x);
+      const tip = `data-tip="${t.uid}"`;
+      if(t.milestone) bar = `<div class="ms ${t.critical?'crit':''}" style="left:${x}px" ${tip}></div>`;
+      else bar = `<div class="bar ${t.summary?'sumbar':''} ${t.critical?'crit':''} ${t.manual?'man':''}" style="left:${x}px;width:${w}px" ${tip}><div class="fill" style="width:${Math.min(100,t.pct)}%"></div></div>`;
+      if(t.summary && t.span && (+t.span[0]<+t.s || +t.span[1]>+t.f)) bar += `<div class="rollup" style="left:${X(t.span[0])}px;width:${Math.max(2,X(t.span[1])-X(t.span[0]))}px" title="Subtasks run ${fmt(t.span[0])} to ${fmt(t.span[1])}"></div>`;
+      if(t.bs && t.bf) bar += `<div class="base" style="left:${X(t.bs)}px;width:${Math.max(2,X(t.bf)-X(t.bs))}px"></div>`;
+      if(showLabels && !t.summary){
+        const lab = t.resources.length ? t.resources.join(', ') : '';
+        if(lab) bar += `<div class="blabel" style="left:${x+w+(t.milestone?10:9)}px">${esc(lab)}</div>`;
+      }
+    }
+    html += `<div class="row ${t.summary?'sum':''} l${lvl} ${ctx?'ctx':''} ${state.sel===t.uid?'sel':''}" data-uid="${t.uid}" data-i="${i}" tabindex="0">
+      <div class="left"><div class="cols">
+        <div class="idc">${t.id??''}</div>
+        <div class="nm" style="padding-left:${4+lvl*16}px">${caret}<span class="lbl" title="${esc(t.name)}">${hl(t.name||'')}</span>${tags}</div>
+        <div class="r">${esc(dur(t))}</div>
+        <div>${fmt(t.s)}</div><div>${fmt(t.f)}</div>
+        <div class="r">${Math.round(t.pct)}%</div>
+      </div></div>
+      <div class="lane" style="width:${W}px">${bar}</div></div>`;
+  });
+
+  // dependency lines
+  let paths='';
+  if(state.links){
+    const idx = new Map(rows.map((r,i)=>[r.t.uid,i]));
+    for(const {t} of rows){
+      for(const p of t.preds){
+        if(!idx.has(p.uid)) continue;
+        const a = state.byUid.get(p.uid); if(!a.s||!t.s) continue;
+        const ya = idx.get(p.uid)*30+15, yb = idx.get(t.uid)*30+15;
+        const type = p.type||'FS';
+        const xa = type[0]==='S' ? X(a.s) : X(a.f);
+        const xb = type[1]==='S' ? X(t.s) : X(t.f);
+        const dir = type[1]==='S' ? 1 : -1;        // arrive from left for *S, from right for *F
+        const out = type[0]==='S' ? -6 : 6;
+        const crit = a.critical && t.critical ? 'crit' : '';
+        const yMid = yb + (yb>ya ? -15 : 15);
+        // Straight drop when the successor starts after the predecessor ends, otherwise an S-shaped elbow
+        const d = (dir===1 && type[0]==='F' && xb-10 >= xa+6)
+          ? `M${xa} ${ya}H${xb-10}V${yb}H${xb-2}`
+          : `M${xa} ${ya}h${out}V${yMid}H${xb-dir*10}V${yb}H${xb-dir*2}`;
+        const ah = dir===1 ? `M${xb-6} ${yb-3.5}L${xb} ${yb}L${xb-6} ${yb+3.5}Z` : `M${xb+6} ${yb-3.5}L${xb} ${yb}L${xb+6} ${yb+3.5}Z`;
+        paths += `<path class="${crit}" d="${d}"/><path class="ah ${crit}" d="${ah}"/>`;
+      }
+    }
+  }
+
+  const left = getComputedStyle(document.documentElement).getPropertyValue('--left').trim();
+  $('#sheet').style.width = `calc(${left} + ${W}px)`;
+  $('#sheet').innerHTML = `
+    <div class="hrow"><div class="hleft"><div class="cols"><div>ID</div><div>Task name</div><div class="r">Duration</div><div>Start</div><div>Finish</div><div class="r">Done</div></div></div>
+      <div class="scale" style="width:${W}px"><div class="t1">${t1}</div><div class="t2">${t2}</div></div></div>
+    <div class="bg" style="left:${left};width:${W}px;height:${H}px">${bg}</div>
+    <svg class="links" style="left:${left}" width="${W}" height="${H}">${paths}</svg>
+    <div class="rows">${html}</div>`;
+}
+
+/* ---------- interactions ---------- */
+$('#sheet').addEventListener('click', e=>{
+  const c = e.target.closest('.caret[data-c]');
+  if(c){ const u=+c.dataset.c; state.collapsed.has(u)?state.collapsed.delete(u):state.collapsed.add(u); render(); e.stopPropagation(); return; }
+  const row = e.target.closest('.row[data-uid]'); if(row){ const u=+row.dataset.uid; openDrawer(u); revealBar(u); }
+});
+$('#sheet').addEventListener('keydown', e=>{
+  const row = e.target.closest('.row[data-uid]'); if(!row) return;
+  const u = +row.dataset.uid;
+  if(e.key==='Enter'){ openDrawer(u); }
+  else if(e.key==='ArrowDown' || e.key==='ArrowUp'){ e.preventDefault(); let n=row; do{ n = e.key==='ArrowDown'? n.nextElementSibling : n.previousElementSibling; }while(n && !n.dataset.uid); n?.focus(); }
+  else if((e.key==='ArrowLeft'||e.key==='ArrowRight') && state.kids.has(u)){ e.key==='ArrowLeft'?state.collapsed.add(u):state.collapsed.delete(u); render(); document.querySelector(`.row[data-uid="${u}"]`)?.focus(); }
+});
+let qT; $('#q').addEventListener('input', e=>{ clearTimeout(qT); qT=setTimeout(()=>{ state.q=e.target.value; render(); },120); });
+$('#filter').onchange = e=>{ state.filter=e.target.value; render(); };
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+  const board=$('#board'), lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const centerT = state.t0 + ((board.scrollLeft + (board.clientWidth-lw)/2)/state.px)*DAY;
+  state.zoom=b.dataset.z; document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed', x===b)); setRange(); render();
+  board.scrollLeft = Math.max(0, X(centerT) - (board.clientWidth-lw)/2);
+});
+$('#expand').onclick=()=>{ state.collapsed.clear(); render(); };
+$('#collapse').onclick=()=>{ state.collapsed = new Set([...state.kids.keys()].filter(u=>u!==state.rootUid)); render(); };
+$('#showLinks').onchange=e=>{ state.links=e.target.checked; render(); };
+$('#today').onclick=()=>{
+  const board=$('#board'), lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const now=today();
+  if(+now<state.t0 || +now>state.t1){ flash(`Today (${fmt(now)}) is outside this schedule, which runs ${fmt(state.min)} to ${fmt(state.max)}.`); board.scrollLeft = +now<state.t0 ? 0 : board.scrollWidth; return; }
+  board.scrollTo({left: Math.max(0, X(now)-(board.clientWidth-lw)/2), behavior:'smooth'});
+};
+function flash(msg){ const t=$('#tip'); t.innerHTML=esc(msg); t.style.display='block'; const r=$('#today').getBoundingClientRect(); t.style.left=Math.max(8,Math.min(innerWidth-330,r.left-120))+'px'; t.style.top=(r.bottom+8)+'px'; clearTimeout(flash.t); flash.t=setTimeout(()=>t.style.display='none',3500); }
+
+// tooltip on bars
+const tip=$('#tip');
+$('#sheet').addEventListener('mousemove', e=>{
+  const el = e.target.closest('[data-tip]');
+  if(!el){ tip.style.display='none'; return; }
+  const t = state.byUid.get(+el.dataset.tip);
+  tip.innerHTML = `<b>${esc(t.name)}</b><span>${fmt(t.s)} → ${fmt(t.f)} · ${esc(dur(t))} · ${Math.round(t.pct)}% done</span>${t.critical?'<br><span style="color:#F1C9C0">Critical path</span>':''}`;
+  tip.style.display='block';
+  const x = Math.min(e.clientX+14, innerWidth-tip.offsetWidth-8), y = e.clientY+16 + tip.offsetHeight > innerHeight ? e.clientY-tip.offsetHeight-10 : e.clientY+16;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+});
+$('#sheet').addEventListener('mouseleave',()=>tip.style.display='none');
+
+/* ---------- drawer ---------- */
+const TYPE = {FS:'Finish-to-start',SS:'Start-to-start',FF:'Finish-to-finish',SF:'Start-to-finish'};
+function linkList(items){
+  if(!items.length) return '<p class="none">None</p>';
+  return '<ul>'+items.map(it=>{ const t=state.byUid.get(it.uid); return `<li><button data-go="${t.uid}"><span>${t.id}</span><span>${esc(t.name)}</span><span class="rt">${it.type||'FS'}${it.lag?' '+esc(it.lag):''}</span></button></li>`; }).join('')+'</ul>';
+}
+function openDrawer(uid){
+  const t = state.byUid.get(uid); if(!t || t.blank) return;
+  state.sel = uid;
+  document.querySelectorAll('.row.sel').forEach(r=>r.classList.remove('sel'));
+  document.querySelector(`.row[data-uid="${uid}"]`)?.classList.add('sel');
+  const path=[]; let p=t.parent; while(p!=null && p!==state.rootUid){ const pt=state.byUid.get(p); if(!pt) break; path.unshift(pt.name); p=pt.parent; }
+  const kind = t.milestone?'Milestone':t.summary?'Summary task':'Task';
+  const rows = [
+    ['Type', `${kind}${t.manual?', manually scheduled':''}${t.active?'':' (inactive)'}`],
+    t.summary && t.span && (+t.span[0]<+t.s || +t.span[1]>+t.f) && ['Subtasks run', `${fmt(t.span[0])} → ${fmt(t.span[1])}<br><span class="none">Outside this summary's own dates</span>`],
+    ['Start', fmtLong(t.s)], ['Finish', fmtLong(t.f)], ['Duration', esc(dur(t))],
+    ['Progress', `${Math.round(t.pct)}%<div class="meter"><i style="width:${Math.min(100,t.pct)}%"></i></div>`],
+    ['Critical path', t.critical?'<span style="color:var(--crit);font-weight:600">Yes</span>':'No'],
+    t.totalSlack && ['Total slack', esc(t.totalSlack.replace(/\.0(?=[a-z])/,''))],
+    (t.actualStart||t.actualFinish) && ['Actual', `${fmtLong(parse(t.actualStart))}<br>${t.actualFinish?fmtLong(parse(t.actualFinish)):'not finished'}`],
+    (t.bs||t.bf) && ['Baseline', `${fmt(t.bs)} → ${fmt(t.bf)}`],
+    t.work && parseFloat(t.work) !== 0 && ['Work', esc(t.work.replace(/\.0h$/,'h'))],
+    t.cost ? ['Cost', t.cost.toLocaleString(undefined,{maximumFractionDigits:2})] : null,
+    ['Resources', t.resources.length?esc(t.resources.join(', ')):'<span class="none">None assigned</span>'],
+  ].filter(Boolean);
+  const kids = (state.kids.get(uid)||[]).map(u=>state.byUid.get(u)).filter(k=>!k.blank);
+  $('#drawer').innerHTML = `
+    <header><div style="flex:1;min-width:0"><div class="wbs">ID ${t.id} · WBS ${esc(t.wbs||'—')}${path.length?' · '+esc(path.join(' › ')):''}</div><h3>${esc(t.name)}</h3></div>
+      <button class="x" id="close" aria-label="Close details"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></header>
+    <div class="body">
+      <dl>${rows.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>
+      <h4>Predecessors</h4>${linkList(t.preds)}
+      <h4>Successors</h4>${linkList(state.succ.get(uid)||[])}
+      ${kids.length?`<h4>Subtasks (${kids.length})</h4>${linkList(kids.map(k=>({uid:k.uid,type:fmt(k.s)})))}`:''}
+      <h4>Notes</h4>${t.notes?`<div class="notes">${esc(t.notes)}</div>`:'<p class="none">No notes</p>'}
+    </div>`;
+  $('#drawer').classList.add('open'); $('#drawer').setAttribute('aria-hidden','false');
+  $('#close').onclick = closeDrawer;
+  $('#drawer').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>goTo(+b.dataset.go));
+}
+function revealBar(uid){
+  const t=state.byUid.get(uid), board=$('#board'); if(!t?.s) return;
+  const lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left'));
+  const x0=X(t.s), x1=X(t.f), vw=board.clientWidth-lw-Math.min(400,innerWidth);
+  if(x1 < board.scrollLeft || x0 > board.scrollLeft+Math.max(200,vw)) board.scrollTo({left:Math.max(0,x0-80),behavior:'smooth'});
+}
+function closeDrawer(){ $('#drawer').classList.remove('open'); $('#drawer').setAttribute('aria-hidden','true'); const u=state.sel; state.sel=null; document.querySelectorAll('.row.sel').forEach(r=>r.classList.remove('sel')); if(u!=null) document.querySelector(`.row[data-uid="${u}"]`)?.focus(); }
+function goTo(uid){
+  let p = state.byUid.get(uid).parent, changed=false;
+  while(p!=null){ if(state.collapsed.delete(p)) changed=true; p=state.byUid.get(p)?.parent; }
+  if(!state.rows.some(r=>r.t.uid===uid)){ state.q=''; $('#q').value=''; state.filter='all'; $('#filter').value='all'; changed=true; }
+  if(changed) render();
+  const row = document.querySelector(`.row[data-uid="${uid}"]`), board=$('#board');
+  if(row){ const lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left')); const t=state.byUid.get(uid);
+    board.scrollTo({top: row.offsetTop - board.clientHeight/2, left: t.s?Math.max(0,X(t.s)-80):board.scrollLeft, behavior:'smooth'}); }
+  openDrawer(uid);
+}
+addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#drawer').classList.contains('open')) closeDrawer(); });
+
+/* ---------- export ---------- */
+$('#csv').onclick = ()=>{
+  const cols = ['ID','WBS','Level','Name','Summary','Milestone','Critical','Manual','Duration','Start','Finish','% Complete','Total slack','Predecessors','Resources','Notes'];
+  const q = v => { v = v==null ? '' : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
+  const lines = [cols.join(',')];
+  for(const {t,ctx} of state.rows){ if(t.blank) continue;
+    lines.push([t.id,t.wbs,t.level,t.name,t.summary,t.milestone,t.critical,t.manual,dur(t),t.start,t.finish,t.pct,t.totalSlack,
+      t.preds.map(p=>`${state.byUid.get(p.uid).id}${p.type&&p.type!=='FS'?p.type:''}${p.lag?(p.lag.startsWith('-')?'':'+')+p.lag:''}`).join(';'),
+      t.resources.join(';'), t.notes].map(q).join(','));
+  }
+  const blob = new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download = (state.data.project.fileName||'project').replace(/\.[^.]+$/,'') + '.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+addEventListener('resize', ()=>{ if(state.data) render(); });
+</script>
+</body>
+</html>
