@@ -14,7 +14,7 @@
   --rule:#DCE3E2; --rule-2:#EBF0EF; --weekend:#EEF2F1;
   --teal-d:#0E5E6F; --teal:#3A8FA3; --teal-l:#BFDDE4;
   --crit:#C2452D; --crit-l:#F1C9C0; --today:#D99A00; --sel:#E2EFF2;
-  --row:30px; --left:700px;
+  --row:30px; --left:742px;
   --sans:"IBM Plex Sans",system-ui,sans-serif; --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
@@ -79,8 +79,8 @@ select{border:1px solid var(--rule);border-radius:7px;padding:6px 8px;background
 .sheet{position:relative}
 .hrow{position:sticky;top:0;z-index:5;display:flex;height:52px;background:var(--sheet);border-bottom:1px solid var(--rule)}
 .hleft{position:sticky;left:0;z-index:6;flex:none;width:var(--left);display:grid;align-items:end;background:var(--sheet);border-right:1px solid var(--rule)}
-.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 104px 106px 106px 50px}
-.hleft .cols>div{padding:0 8px 7px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.cols{display:grid;grid-template-columns:44px minmax(0,1fr) 104px 106px 106px 92px}
+.hleft .cols>div{white-space:nowrap;padding:0 8px 7px;font-size:12px;font-weight:500;color:var(--ink-2)}
 .hleft .cols>div.r,.row .r{text-align:right}
 .scale{position:relative;flex:none;height:52px}
 .scale .t1,.scale .t2{position:absolute;left:0;right:0;height:26px}
@@ -1304,7 +1304,7 @@ function render(){
   const left = getComputedStyle(document.documentElement).getPropertyValue('--left').trim();
   $('#sheet').style.width = `calc(${left} + ${W}px)`;
   $('#sheet').innerHTML = `
-    <div class="hrow"><div class="hleft"><div class="cols"><div>ID</div><div>Task name</div><div class="r">Duration</div><div>Start</div><div>Finish</div><div class="r">Done</div></div></div>
+    <div class="hrow"><div class="hleft"><div class="cols"><div>ID</div><div>Task Name</div><div class="r">Duration</div><div>Start</div><div>Finish</div><div class="r">% Complete</div></div></div>
       <div class="scale" style="width:${W}px"><div class="t1">${t1}</div><div class="t2">${t2}</div></div></div>
     <div class="bg" style="left:${left};width:${W}px;height:${H}px">${bg}</div>
     <svg class="links" style="left:${left}" width="${W}" height="${H}">${paths}</svg>
@@ -1459,13 +1459,13 @@ function zip(files){                       // files: [{name, text}] -> Blob (sto
 function buildXlsx(rows){
   const x = s => String(s ?? '').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
   const tasks = rows.map(r=>r.t);
-  const hasRes = tasks.some(t=>t.resources && t.resources.length), hasNotes = tasks.some(t=>t.notes);
+  const hasRes = true, hasNotes = tasks.some(t=>t.notes);
   const cols = [
     { h:'ID', w:6, align:'center' },
     { h:'Task Name', w:62, align:'left' },
     { h:'Duration', w:14, align:'center' },
-    { h:'Start Date', w:15, align:'center', date:true },
-    { h:'Finish Date', w:15, align:'center', date:true },
+    { h:'Start', w:15, align:'center', date:true },
+    { h:'Finish', w:15, align:'center', date:true },
     { h:'Predecessors', w:15, align:'center' },
     ...(hasRes ? [{ h:'Resource Names', w:26, align:'left' }] : []),
     ...(hasNotes ? [{ h:'Notes', w:50, align:'left' }] : []),
